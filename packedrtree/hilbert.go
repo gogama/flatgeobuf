@@ -18,7 +18,7 @@ const (
 )
 
 // hilbertSortable is an implementation of sort.Interface which allows
-// us to use the reflection-free, hence slightly more performance,
+// us to use the reflection-free, hence slightly more performant,
 // sort.Sort function instead of sort.Slice.
 type hilbertSortable struct {
 	items      []Box // TODO: Use correct name and type for this
