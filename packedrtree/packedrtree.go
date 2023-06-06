@@ -143,7 +143,7 @@ type packedRTree struct {
 	nodeSize int
 	// levels is the list of levelRange boundaries. Note that in keeping with
 	// the other Flatgeofbuf implementations (and the Hilbert R-Tree at
-	// https://en.wikipedia.org/wiki/Hilbert_R-tree, the leaf nodes are
+	// https://en.wikipedia.org/wiki/Hilbert_R-tree), the leaf nodes are
 	// at levelRange 0 and the root node is at len(levels)-1.
 	levels []levelRange
 	// nodes is the complete list of nodes in the tree, including
