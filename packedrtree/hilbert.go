@@ -21,46 +21,45 @@ const (
 // us to use the reflection-free, hence slightly more performant,
 // sort.Sort function instead of sort.Slice.
 type hilbertSortable struct {
-	items      []Box // TODO: Use correct name and type for this
+	refs       []Ref
 	x, y, w, h float64
 }
 
 func (hs *hilbertSortable) Len() int {
-	return len(hs.items)
+	return len(hs.refs)
 }
 
 func (hs *hilbertSortable) Less(i, j int) bool {
-	a := hilbertOfCenter(&hs.items[i], hs.x, hs.y, hs.w, hs.h)
-	b := hilbertOfCenter(&hs.items[j], hs.x, hs.y, hs.w, hs.h)
+	a := hilbertOfCenter(&hs.refs[i].Box, hs.x, hs.y, hs.w, hs.h)
+	b := hilbertOfCenter(&hs.refs[j].Box, hs.x, hs.y, hs.w, hs.h)
 	return a > b
 }
 
 func (hs *hilbertSortable) Swap(i, j int) {
-	hs.items[i], hs.items[j] = hs.items[j], hs.items[i]
+	hs.refs[i], hs.refs[j] = hs.refs[j], hs.refs[i]
 }
 
-// HilbertSort sorts a list of [TO DO], whose bounding box is given by
-// bounds, according to the order given by a Hilbert curve of order
-// HilbertOrder.
+// HilbertSort sorts a list of feature references, whose overall
+// bounding box is given by bounds, according to the order given by a
+// Hilbert curve of order HilbertOrder.
 //
 // The sort algorithm is not guaranteed to be stable, so the relative
-// position of two [TO DOs] with the same index on the Hilbert curve
-// may change as a result of the sort.
-func HilbertSort(items []Box, extent *Box) {
-	// FIXME: Sort out the correct name and type for items.
+// position of two feature references with the same index on the Hilbert
+// curve may change as a result of the sort.
+func HilbertSort(refs []Ref, bounds *Box) {
 	hs := hilbertSortable{
-		items: items,
-		x:     extent.XMin,
-		y:     extent.YMin,
-		w:     extent.Width(),
-		h:     extent.Height(),
+		refs: refs,
+		x:    bounds.XMin,
+		y:    bounds.YMin,
+		w:    bounds.Width(),
+		h:    bounds.Height(),
 	}
 	sort.Sort(&hs)
 }
 
 // hilbertOfCenter calculates the Hilbert curve index of the center
-// coordinate of [TO DO whatever b is] in the context of a set of [TODO whatever b is]
-// bounded by the rectangle (ex, ey, ex+ew, ey+eh).
+// coordinate of a Box in the context of a set of boxes bounded by the
+// rectangle (ex, ey, ex+ew, ey+eh).
 //
 // NOTES:
 //   - 32-bit integers are used because the full 64 bits are not

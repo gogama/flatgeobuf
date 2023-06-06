@@ -183,6 +183,9 @@ func new(numRefs int, nodeSize uint16, push pushFunc, pop popFunc, fetch fetchFu
 	}, nil
 }
 
+// search implements a generic Hilbert R-Tree search function which is
+// capable of streaming search depending on the callback functions
+// configured in prt.
 func (prt *packedRTree) search(b Box) ([]Result, error) {
 	q := make(ticketBag, 1)
 	q[0] = ticket{nodeIndex: 0, level: len(prt.levels) - 1}
@@ -223,12 +226,16 @@ func (prt *packedRTree) search(b Box) ([]Result, error) {
 	}
 }
 
-// TODO: Docs
+// PackedRTree is a packed Hilbert R-Tree.
 type PackedRTree struct {
 	packedRTree
 }
 
-// TODO: Docs
+// New creates a new packed Hilbert R-Tree from a non-empty,
+// Hilbert-sorted array of feature references.
+//
+// Use HilbertSort to sort the feature references. If the input slice is
+// not Hilbert-sorted, the behavior of the new PackedRTree is undefined.
 func New(refs []Ref, nodeSize uint16) (*PackedRTree, error) {
 	// Create the internal data structure.
 	prt, err := new(len(refs), nodeSize, stackPush, stackPop, nil)
@@ -282,7 +289,7 @@ func (prt *PackedRTree) Marshal(w io.Writer) error {
 }
 
 func Unmarshal(r io.Reader) (*PackedRTree, error) {
-	// TODO: This will be t he opposite of WriteTo, in that it will
+	// TODO: This will be t he opposite of Marshal, in that it will
 	//       read the whole thing including the internal nodes.
 }
 
