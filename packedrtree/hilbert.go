@@ -9,7 +9,7 @@ const (
 	// HilbertOrder is the order of the Hilbert curve used in
 	// HilbertSort.
 	HilbertOrder = 16
-	// hilbertMax is the maximum input X- or Y-coordinate hilbertFromXY.
+	// hilbertMax is the maximum input X- or Y-coordinate hilbertOfXY.
 	//
 	// In a Hilbert curve of order N, X- and Y- coordinates range from
 	// zero to 2^N-1, so in a Hilbert curve of order 1, the X- and Y-
@@ -30,8 +30,8 @@ func (hs *hilbertSortable) Len() int {
 }
 
 func (hs *hilbertSortable) Less(i, j int) bool {
-	a := hilbertFromBox(&hs.items[i], hs.x, hs.y, hs.w, hs.h)
-	b := hilbertFromBox(&hs.items[j], hs.x, hs.y, hs.w, hs.h)
+	a := hilbertOfCenter(&hs.items[i], hs.x, hs.y, hs.w, hs.h)
+	b := hilbertOfCenter(&hs.items[j], hs.x, hs.y, hs.w, hs.h)
 	return a > b
 }
 
@@ -58,15 +58,15 @@ func HilbertSort(items []Box, extent *Box) {
 	sort.Sort(&hs)
 }
 
-// hilbertFromBBox calculates the Hilbert curve index of a given
-// [TO DO whatever b is] in the context of a set of [TODO whatever b is]
+// hilbertOfCenter calculates the Hilbert curve index of the center
+// coordinate of [TO DO whatever b is] in the context of a set of [TODO whatever b is]
 // bounded by the rectangle (ex, ey, ex+ew, ey+eh).
 //
 // NOTES:
 //   - 32-bit integers are used because the full 64 bits are not
 //     required and the smaller data size may theoretically result in
 //     memory/bandwidth/cache benefits at the CPU level, maybe.
-func hilbertFromBox(b *Box, ex, ey, ew, eh float64) uint32 {
+func hilbertOfCenter(b *Box, ex, ey, ew, eh float64) uint32 {
 	// FIXME: Sort out the correct name and type for b.
 	var hx uint32 // Hilbert X-coordinate between 0 and hilbertMax
 	if ew != 0.0 {
@@ -78,10 +78,10 @@ func hilbertFromBox(b *Box, ex, ey, ew, eh float64) uint32 {
 		ry := (b.midY() - ey) / ey
 		hx = uint32(math.Floor(hilbertMax * ry))
 	}
-	return hilbertFromXY(hx, hy)
+	return hilbertOfXY(hx, hy)
 }
 
-// hilbertFromXY calculates the Hilbert curve index of a given
+// hilbertOfXY calculates the Hilbert curve index of a given
 // two-dimensional coordinate.
 //
 // NOTES:
@@ -89,7 +89,7 @@ func hilbertFromBox(b *Box, ex, ey, ew, eh float64) uint32 {
 //     is in the public domain.
 //   - This version of the code is a straight conversion to GoLang from
 //     https://github.com/flatgeobuf/flatgeobuf/blob/20fd93430cd78907c7843cf26d601574d3c5b913/src/cpp/packedrtree.cpp.
-func hilbertFromXY(x, y uint32) uint32 {
+func hilbertOfXY(x, y uint32) uint32 {
 	a := x ^ y
 	b := 0xFFFF ^ a
 	c := 0xFFFF ^ (x | y)
