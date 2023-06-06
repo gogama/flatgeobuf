@@ -32,7 +32,7 @@ func (hs *hilbertSortable) Len() int {
 func (hs *hilbertSortable) Less(i, j int) bool {
 	a := hilbertFromBox(&hs.items[i], hs.x, hs.y, hs.w, hs.h)
 	b := hilbertFromBox(&hs.items[j], hs.x, hs.y, hs.w, hs.h)
-	return a-b < 0
+	return a > b
 }
 
 func (hs *hilbertSortable) Swap(i, j int) {
