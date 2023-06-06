@@ -40,7 +40,7 @@ func (hs *hilbertSortable) Swap(i, j int) {
 }
 
 // HilbertSort sorts a list of [TO DO], whose bounding box is given by
-// extent, according to the order given by a Hilbert curve of order
+// bounds, according to the order given by a Hilbert curve of order
 // HilbertOrder.
 //
 // The sort algorithm is not guaranteed to be stable, so the relative
@@ -65,7 +65,7 @@ func HilbertSort(items []Box, extent *Box) {
 // NOTES:
 //   - 32-bit integers are used because the full 64 bits are not
 //     required and the smaller data size may theoretically result in
-//     memory/bandwidth/cache benefits at the CPU level, maybe.
+//     memory/bandwidth/cache benefits at the CPU levelRange, maybe.
 func hilbertOfCenter(b *Box, ex, ey, ew, eh float64) uint32 {
 	// FIXME: Sort out the correct name and type for b.
 	var hx uint32 // Hilbert X-coordinate between 0 and hilbertMax
