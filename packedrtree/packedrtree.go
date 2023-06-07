@@ -178,11 +178,11 @@ type packedRTree struct {
 	fetch fetchFunc
 }
 
-// new constructs a new packedRTree.
+// noo constructs a new packedRTree.
 //
-// In the official Flatgeobuf implementations, new is most analogous to
+// In the official Flatgeobuf implementations, noo is most analogous to
 // the function or method named init().
-func new(numRefs int, nodeSize uint16, push pushFunc, pop popFunc, fetch fetchFunc) (packedRTree, error) {
+func noo(numRefs int, nodeSize uint16, push pushFunc, pop popFunc, fetch fetchFunc) (packedRTree, error) {
 	if numRefs < 1 {
 		return packedRTree{}, errors.New("packedrtree: empty tree not allowed")
 	} else if nodeSize < 2 {
@@ -269,7 +269,7 @@ type PackedRTree struct {
 // not Hilbert-sorted, the behavior of the new PackedRTree is undefined.
 func New(refs []Ref, nodeSize uint16) (*PackedRTree, error) {
 	// Create the private, non-exported data structure.
-	prt, err := new(len(refs), nodeSize, stackPush, stackPop, nil)
+	prt, err := noo(len(refs), nodeSize, stackPush, stackPop, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -359,7 +359,7 @@ func Seek(r io.ReadSeeker, numRefs int, nodeSize uint16, b Box) ([]Result, error
 	// Construct the private data structure using a min-heap for the
 	// work tracking ticket bag to ensure the index is read
 	// sequentially.
-	prt, err := new(numRefs, nodeSize, heapPush, heapPop, fetch)
+	prt, err := noo(numRefs, nodeSize, heapPush, heapPop, fetch)
 	if err != nil {
 		return nil, err
 	}
