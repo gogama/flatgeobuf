@@ -2,6 +2,7 @@ package packedrtree
 
 import (
 	"container/heap"
+	"errors"
 	"io"
 )
 
@@ -11,6 +12,9 @@ import (
 // the bounding box of the feature's geometry.
 type Ref struct {
 	Box
+
+	// Offset is the referenced feature's byte offset into the data
+	// section.
 	Offset int
 }
 
@@ -92,13 +96,35 @@ func levelify(numRefs, nodeSize int) []levelRange {
 // for streaming index searches.
 type fetchFunc func(i, j int, nodes []node) error
 
-// TODO: docs
+// A ticket is a pending work item to be executed during a packedRTree
+// search loop.
 type ticket struct {
+	// nodeIndex is the index of the first node to search.
 	nodeIndex int
-	level     int
+	// level is the R-Tree level that nodeIndex belongs to. Recall that
+	// level 0 contains the leaf nodes.
+	level int
 }
 
-// TODO: docs
+// A ticketBag is a collection of pending work items to be executed
+// during a packedRTree search loop.
+//
+// The reason type is a "bag" and not, for example, a queue, is that it
+// can have arbitrary behavior defined by the packedRTree's pushFunc and
+// popFunc. When performing a streaming search, the Seek function wants
+// to traverse the index in sequential order, so ticketBag behaves like
+// a min-heap (and implements heap.Interface for this purpose). When
+// performing a search of static data contained in a PackedRTree, this
+// .......
+//
+// TODO: The above documentation trails off because I'm not sure if what
+//
+//		I was going to say is true. Current implementation is to use a
+//		bare stack in this case, which is what the Java code does, but I
+//	 just want to make sure that works. In Java, they sort the stack for
+//	 the streaming implementation and don't sort it for non-streaming.
+//	 Just want to make sure that using a stack is actually correct in the
+//	 static case /TODO.
 type ticketBag []ticket
 
 func (tq ticketBag) Len() int            { return len(tq) }
@@ -149,9 +175,11 @@ type packedRTree struct {
 	// nodes is the complete list of nodes in the tree, including
 	// internal and leaf nodes.
 	nodes []node
-	// TODO
+	// push is the function used to push a work ticket into a ticketBag
+	// when executing a tree search. It may not be nil.
 	push pushFunc
-	// TODO
+	// pop is the function used to pop the next work ticket from a
+	// ticketBag when executing a tree search. It may not be nil.
 	pop popFunc
 	// fetch is the function used to fetch missing nodes into the nodes
 	// slice for streaming index search use cases. If all nodes are
@@ -164,10 +192,10 @@ type packedRTree struct {
 // In the official Flatgeobuf implementations, new is most analogous to
 // the function or method named init().
 func new(numRefs int, nodeSize uint16, push pushFunc, pop popFunc, fetch fetchFunc) (packedRTree, error) {
-
-	var err error // TODO: Error handling.
-	if err != nil {
-		return packedRTree{}, err
+	if numRefs < 1 {
+		return packedRTree{}, errors.New("packedrtree: empty tree not allowed")
+	} else if nodeSize < 2 {
+		return packedRTree{}, errors.New("packedrtree: node size must be at least 2")
 	}
 
 	levels := levelify(numRefs, int(nodeSize))
@@ -181,6 +209,18 @@ func new(numRefs int, nodeSize uint16, push pushFunc, pop popFunc, fetch fetchFu
 		pop:      pop,
 		fetch:    fetch,
 	}, nil
+}
+
+// Result is a single index search result. A Result's fields can be used
+// to locate the corresponding feature in the main data section of the
+// Flatgeobuf file, or in the Ref list passed to New when creating the
+// PackedRTree.
+type Result struct {
+	// Offset is the result feature's byte offset into the data section.
+	Offset int
+	// RefIndex of the feature reference in the Hilbert-sorted list of
+	// Ref values passed to New when creating the PackedRTree.
+	RefIndex int
 }
 
 // search implements a generic Hilbert R-Tree search function which is
@@ -214,7 +254,7 @@ func (prt *packedRTree) search(b Box) ([]Result, error) {
 			if !b.intersects(&n.Box) {
 				continue
 			} else if isLeafLevel {
-				r = append(r, Result{Offset: n.Offset, Index: pos - prt.levels[0].i})
+				r = append(r, Result{Offset: n.Offset, RefIndex: pos - prt.levels[0].start})
 			} else {
 				prt.push(&q, ticket{nodeIndex: n.Offset, level: t.level - 1})
 			}
@@ -270,22 +310,44 @@ func New(refs []Ref, nodeSize uint16) (*PackedRTree, error) {
 	return &PackedRTree{prt}, nil
 }
 
-// TODO: Docs
+// Bounds returns the bounding box around all features referenced by the
+// packed Hilbert R-Tree.
 func (prt *PackedRTree) Bounds() Box {
 	return prt.nodes[len(prt.nodes)-1].Box
 }
 
-// TODO: docs
+// Search searches the packed Hilbert R-Tree for qualified matches
+// whose bounding rectangles intersect the query box.
+//
+// To directly search the index section of Flatgeobuf file without
+// creating a PackedRTree, consider using the Seek function.
 func (prt *PackedRTree) Search(b Box) []Result {
 	r, err := prt.search(b)
 	if err != nil {
-		// TODO: Panic here, as should never have an error.
+		panic(err) // prt.search should never return error in this case.
 	}
 	return r
 }
 
+// Marshal serializes the packed Hilbert R-Tree as a Flatgeobuf index
+// section.
+//
+// If you are writing a complete Flatgeobuf file, the writer should be
+// positioned ready to write the first byte of the index. If this method
+// returns without error, the writer will be positioned ready to write
+// the first byte of the data section.
 func (prt *PackedRTree) Marshal(w io.Writer) error {
-	// TODO
+	// TODO: For now can use encoding/binary's BigEndian to write the byte.
+	// TODO: I would be inclined to use one of the available tricks to
+	//       determine the endianness of the platform. If it already
+	//       BigEndian just do the closest thing to a byte dump, otherwise
+	//       use encoding/binary. Except encoding binary may be ultraslow...
+	//       Maybe there's something else?
+	//
+	// TODO: Another option is to use https://github.com/yalue/native_endian
+	//       but I would be more inclined to borrow its approach (find
+	//       out how it used compile-time build tags to solve endianness).
+	//
 }
 
 func Unmarshal(r io.Reader) (*PackedRTree, error) {
