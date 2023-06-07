@@ -18,11 +18,11 @@ type Ref struct {
 	Offset int
 }
 
-// A node is an internal version of Ref used to (hopefully) reduce
+// A node is a private version of Ref used to (hopefully) reduce
 // confusion. A leaf node is exactly the same as a Ref and has the
-// same meaning. For an internal node, the Box is the bounding box of
-// the entire internal node; and the Offset represents the node index
-// of the node's first child node.
+// same meaning. A non-leaf node is subtly different: the Box is the
+// extent of the entire subtree rooted at the non-leaf node; and the
+// Offset represents the node index of the node's first child node.
 type node struct {
 	Ref
 }
@@ -158,7 +158,7 @@ func heapPop(tq *ticketBag) ticket {
 	return heap.Pop(tq).(ticket)
 }
 
-// A packedRTree is an internal type which carries most of the generic
+// A packedRTree is a private type which carries most of the generic
 // functionality required by PackedRTree and Seek. Unlike PackedRTree, a
 // packedRTree is capable of streaming index search.
 type packedRTree struct {
@@ -277,7 +277,7 @@ type PackedRTree struct {
 // Use HilbertSort to sort the feature references. If the input slice is
 // not Hilbert-sorted, the behavior of the new PackedRTree is undefined.
 func New(refs []Ref, nodeSize uint16) (*PackedRTree, error) {
-	// Create the internal data structure.
+	// Create the private, non-exported data structure.
 	prt, err := new(len(refs), nodeSize, stackPush, stackPop, nil)
 	if err != nil {
 		return nil, err
@@ -306,7 +306,7 @@ func New(refs []Ref, nodeSize uint16) (*PackedRTree, error) {
 			}
 		}
 	}
-	// Return external data structure.
+	// Return the exported data structure.
 	return &PackedRTree{prt}, nil
 }
 
@@ -365,7 +365,7 @@ func Seek(r io.ReadSeeker, numRefs int, nodeSize uint16, b Box) ([]Result, error
 		//           https://github.com/flatgeobuf/flatgeobuf/blob/master/src/rust/src/packed_r_tree.rs#L532-L535
 		return nil
 	}
-	// Construct the internal data structure using a min-heap for the
+	// Construct the private data structure using a min-heap for the
 	// work tracking ticket bag to ensure the index is read
 	// sequentially.
 	prt, err := new(numRefs, nodeSize, heapPush, heapPop, fetch)
