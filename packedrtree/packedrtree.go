@@ -114,17 +114,8 @@ type ticket struct {
 // popFunc. When performing a streaming search, the Seek function wants
 // to traverse the index in sequential order, so ticketBag behaves like
 // a min-heap (and implements heap.Interface for this purpose). When
-// performing a search of static data contained in a PackedRTree, this
-// .......
-//
-// TODO: The above documentation trails off because I'm not sure if what
-//
-//		I was going to say is true. Current implementation is to use a
-//		bare stack in this case, which is what the Java code does, but I
-//	 just want to make sure that works. In Java, they sort the stack for
-//	 the streaming implementation and don't sort it for non-streaming.
-//	 Just want to make sure that using a stack is actually correct in the
-//	 static case /TODO.
+// performing a search of static data contained in a PackedRTree,
+// ticketBag behaves like a stack.
 type ticketBag []ticket
 
 func (tq ticketBag) Len() int            { return len(tq) }
