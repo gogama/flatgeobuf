@@ -30,7 +30,6 @@ func (r *Reader) Index() (*packedrtree.PackedRTree, error) {
 func (r *Reader) Data(p []Feature) (int, error) {
 	// TODO: If not at data yet, advance to data and read it.
 	// TODO: Otherwise the error is we're at the end.
-	// TOdO: Implement it in terms of VisitData if possible.
 
 	// TODO: Implement this similar to reader.Read so that it is easy
 	//       to consume the data section as a stream in arbitrary
