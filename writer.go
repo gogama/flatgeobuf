@@ -13,28 +13,32 @@ func NewWriter(w io.Writer) (*Writer, error) {
 	// TODO.
 }
 
-func Header(h *Header) error {
+func (w *Writer) Header(h *Header) error {
 
 }
 
-func Index(index *packedrtree.PackedRTree) error {
+func (w *Writer) Index(index *packedrtree.PackedRTree) error {
 	// TODO: Header must be written.
 	// TODO: Index node size must match same value in header.
 	// TODO: Index feature count must match header.
 }
 
-func IndexData(data []Feature) error {
+func (w *Writer) IndexData(data []Feature) error {
 	// TODO: Header must be written and index may not be written.
-	// TODO: Feature count must match header count.
-	// TODO: Can't call this if index already written.
+	// TODO: Feature count must be exactly equal to header count.
+	// TODO: Can't call this if index already written as a PackedRTree.
 	// TODO: Can't call this if data already written.
 }
 
-func Data(data []Feature) error {
+func (w *Writer) Data(data []Feature) error {
 	// TODO: If index node size was set in header and no index written, BAD.
-	// TODO: Cursory attempt to test that any Index written had same count.
-	// TODO: Can't call this if data already written.
+	// TODO: Total feature count in all calls to this function must not
+	//       exceed total count in header.
 }
 func (w *Writer) Close() error {
-	// TODO
+	// If already closed, error.
+	// If header not written, error.
+	// If index expected and not written, error.
+	// If fewer features written than stated in header, error.
+	// Otherwise, nil!
 }

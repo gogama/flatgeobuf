@@ -1,8 +1,9 @@
 package flatgeobuf
 
 import (
-	"github.com/gogama/flatgeobuf/packedrtree"
 	"io"
+
+	"github.com/gogama/flatgeobuf/packedrtree"
 )
 
 type Reader struct {
@@ -15,32 +16,33 @@ func NewReader(r io.Reader) (*Reader, error) {
 	// TODO: This will check magic number but not read ahead further.
 }
 
-func Header() (Flatgeobuf.Header, error) {
+func (r *Reader) Header() (Header, error) {
 	// TODO :If not at header yet, advance to header, read, and cache it.
 	// TODO: Return Header
 }
 
-func Index() (*packedrtree.PackedRTree, error) {
+func (r *Reader) Index() (*packedrtree.PackedRTree, error) {
 	// TODO: If not at index yet, advance to index, read, and cache it.
 	// TODO: If no index, return nil and ErrNoIndex
 	// TODO: If already passed index, return nil and ErrSkippedIndex
 }
 
-func Data() ([]Flatgeobuf.Feature, error) {
+func (r *Reader) Data(p []Feature) (int, error) {
 	// TODO: If not at data yet, advance to data and read it.
 	// TODO: Otherwise the error is we're at the end.
 	// TOdO: Implement it in terms of VisitData if possible.
+
+	// TODO: Implement this similar to reader.Read so that it is easy
+	//       to consume the data section as a stream in arbitrary
+	//       increments.
 }
 
-func DataSearch(b packedrtree.Box) ([]Flatgeobuf.Feature, error) {
-
+func (r *Reader) DataAll() ([]Feature, error) {
+	// TODO: Convenience version of Data that will read everything
+	//       remaining.
 }
 
-func DataVisit(v VisitFunc) error {
-	// Instead of
-}
-
-func DataSearchVisit(b packedrtree.Box, v VisitFunc) error {
+func (r *Reader) DataSearch(b packedrtree.Box) ([]Feature, error) {
 
 }
 
