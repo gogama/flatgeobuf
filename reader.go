@@ -3,8 +3,6 @@ package flatgeobuf
 import (
 	"github.com/gogama/flatgeobuf/packedrtree"
 	"io"
-
-	"github.com/flatgeobuf/flatgeobuf/src/go/Flatgeobuf"
 )
 
 type Reader struct {
