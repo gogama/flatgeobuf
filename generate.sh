@@ -23,3 +23,6 @@ fi
 # repo's directory should be named flatgeobuf, to get the files
 # generated right in the root.
 flatc --go -o .. --go-namespace flatgeobuf flatgeobuf/src/fbs/*.fbs
+
+(cd flatgeobuf && git describe --tags) >version-schema.txt
+flatc --version >version-flatc.txt
