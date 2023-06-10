@@ -15,7 +15,7 @@ type Ref struct {
 
 	// Offset is the referenced feature's byte offset into the data
 	// section.
-	Offset int
+	Offset int64
 }
 
 // A node is a private version of Ref used to (hopefully) reduce
@@ -27,6 +27,7 @@ type node struct {
 	Ref
 }
 
+// A levelRange represents the range of node indices that comprise a
 // A levelRange represents the range of node indices that comprise a
 // level. Each levelRange is a closed/open node index pair [start, end)
 // where start is the index (into packedRTree's nodes list) of the first
@@ -208,7 +209,7 @@ func noo(numRefs int, nodeSize uint16, push pushFunc, pop popFunc, fetch fetchFu
 // PackedRTree.
 type Result struct {
 	// Offset is the result feature's byte offset into the data section.
-	Offset int
+	Offset int64
 	// RefIndex of the feature reference in the Hilbert-sorted list of
 	// Ref values passed to New when creating the PackedRTree.
 	RefIndex int
@@ -247,7 +248,7 @@ func (prt *packedRTree) search(b Box) ([]Result, error) {
 			} else if isLeafLevel {
 				r = append(r, Result{Offset: n.Offset, RefIndex: pos - prt.levels[0].start})
 			} else {
-				prt.push(&q, ticket{nodeIndex: n.Offset, level: t.level - 1})
+				prt.push(&q, ticket{nodeIndex: int(n.Offset), level: t.level - 1})
 			}
 		}
 		// Stop and return if there is no remaining work.
@@ -342,13 +343,21 @@ func (prt *PackedRTree) Marshal(w io.Writer) error {
 }
 
 func Unmarshal(r io.Reader) (*PackedRTree, error) {
-	// TODO: This will be t he opposite of Marshal, in that it will
+	// TODO: This will be the opposite of Marshal, in that it will
 	//       read the whole thing including the internal nodes.
 }
 
 // TODO: Docs
-func Seek(r io.ReadSeeker, numRefs int, nodeSize uint16, b Box) ([]Result, error) {
+func Seek(rs io.ReadSeeker, numRefs int, nodeSize uint16, b Box) ([]Result, error) {
 	fetch := func(i, j int, nodes []node) error {
+		// TODO: I don't think r needs to be a ReadSeeker with my
+		//       implementation because the reads are all forward, but
+		//       if it is it allows it to jump forward instead of reading
+		//       forward, potentially saving lots of IO. OTOH, we could
+		//       just expect ReadSeeker because someone could wrap any
+		//       sequential access reader in a forward-seekable adapter
+		//       on their own.
+
 		// TODO: Read from the read seeker into nodes
 
 		// TODO: Rust version has a nifty thing where it seeks past the
@@ -363,5 +372,9 @@ func Seek(r io.ReadSeeker, numRefs int, nodeSize uint16, b Box) ([]Result, error
 	if err != nil {
 		return nil, err
 	}
+	// TODO: For this function to work with flatgeobuf.Reader, we should
+	//       ensure that after the index search is finished it seeks to
+	//       the end of the index section, i.e. so that calls to r.Rewind()
+	//       and r.DataSearch() work properly.
 	return prt.search(b)
 }
