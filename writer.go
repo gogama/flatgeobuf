@@ -30,11 +30,24 @@ func (w *Writer) IndexData(data []Feature) error {
 	// TODO: Can't call this if data already written.
 }
 
+func (w *Writer) IndexDataPtr(data []*Feature) error {
+	// TODO: Same as Data but with pointers, since that's more likely
+	//       what people will find it easier to create with the existing
+	//       FlatBuffers generated code.
+}
+
 func (w *Writer) Data(data []Feature) error {
 	// TODO: If index node size was set in header and no index written, BAD.
 	// TODO: Total feature count in all calls to this function must not
 	//       exceed total count in header.
 }
+
+func (w *Writer) DataPtr(data []*Feature) error {
+	// TODO: Same as Data but with pointers, since that's more likely
+	//       what people will find it easier to create with the existing
+	//       FlatBuffers generated code.
+}
+
 func (w *Writer) Close() error {
 	// If already closed, error.
 	// If header not written, error.
