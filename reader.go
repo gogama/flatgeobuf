@@ -1,14 +1,17 @@
 package flatgeobuf
 
 import (
+	flatbuffers "github.com/google/flatbuffers/go"
 	"io"
 	"math"
 	"sort"
 
-	"github.com/gogama/flatgeobuf/littleendian"
 	"github.com/gogama/flatgeobuf/packedrtree"
 )
 
+// Reader reads an underlying stream as a FlatGeobuf file.
+//
+// TODO: Write docs.
 type Reader struct {
 	state readState // TODO: can probably be factored into a super-struct called stateful
 	err   error     // TODO: can probably be factored into a super-struct named stateful
@@ -37,21 +40,27 @@ type Reader struct {
 	// featureIndex is the index of the next feature to read, a number
 	// in the [0, numFeatures].
 	featureIndex int
+	// featureOffset is the offset into the data section of the next
+	// feature to read, a non-negative integer.
+	featureOffset int64
 }
 
 type readState int
 
 const (
-	uninitialized readState = iota
-	beforeMagic
-	beforeHeader
-	afterHeader
-	beforeIndex
-	afterIndex
-	beforeData
-	inData
+	uninitialized readState = 0x00
+	invalid                 = 0x01
+	beforeMagic             = 0x11
+	beforeHeader            = 0x21
+	afterHeader             = 0x22
+	beforeIndex             = 0x31
+	afterIndex              = 0x32
+	inData                  = 0x42
+	eof                     = 0x52
 )
 
+// NewReader creates a new FlatGeobuf reader based on an underlying
+// reader.
 func NewReader(r io.Reader) *Reader {
 	if r == nil {
 		textPanic("nil reader")
@@ -59,19 +68,22 @@ func NewReader(r io.Reader) *Reader {
 	return &Reader{r: r}
 }
 
+// TODO: Write docs.
 func (r *Reader) Header() (*Header, error) {
 	// Transition into state for reading magic number.
 	if err := r.toState(uninitialized, beforeMagic); err != nil {
+		return nil, textErr("Header has already been called")
+	} else if err != nil {
 		return nil, err
 	}
 
 	// Verify the magic number.
 	v, err := Magic(r.r)
 	if err != nil {
-		return nil, r.toError(wrapErr("failed to read magic number", err))
+		return nil, r.toErr(wrapErr("failed to read magic number", err))
 	}
 	if v.Major < MinSpecMajorVersion || v.Major > MaxSpecMajorVersion {
-		return nil, r.toError(fmtErr("magic number has unsupported major version %d", v.Major))
+		return nil, r.toErr(fmtErr("magic number has unsupported major version %d", v.Major))
 	}
 
 	// Transition into state for reading header.
@@ -83,17 +95,20 @@ func (r *Reader) Header() (*Header, error) {
 	// integer.
 	b := make([]byte, 4)
 	if _, err = io.ReadFull(r.r, b); err != nil {
-		return nil, r.toError(wrapErr("failed to read header length", err))
+		return nil, r.toErr(wrapErr("header length read error", err))
 	}
-	headerLen := littleendian.Uint32(b)
-	if headerLen > headerMaxLen {
-		return nil, r.toError(fmtErr("header length %d exceeds limit of %d bytes", headerLen, headerMaxLen))
+	headerLen := flatbuffers.GetUint32(b)
+	if headerLen < 4 {
+		return nil, r.toErr(fmtErr("header length %d not big enough for FlatBuffer uoffset_t", headerLen))
+	} else if headerLen > headerMaxLen {
+		return nil, r.toErr(fmtErr("header length %d exceeds limit of %d bytes", headerLen, headerMaxLen))
 	}
 
 	// Read the header bytes.
-	b = make([]byte, headerLen)
-	if _, err = io.ReadFull(r.r, b); err != nil {
-		return nil, r.toError(wrapErr("failed to read %d header bytes", err, headerLen))
+	tbl := make([]byte, 4+headerLen)
+	copy(tbl, b)
+	if _, err = io.ReadFull(r.r, tbl[4:]); err != nil {
+		return nil, r.toErr(wrapErr("failed to read header table (len=%d)", err, headerLen))
 	}
 
 	// Convert to FlatBuffer-based Header structure and get number of
@@ -102,7 +117,7 @@ func (r *Reader) Header() (*Header, error) {
 	var numFeatures uint64
 	var nodeSize uint16
 	if err = safeFlatBuffersInteraction(func() {
-		hdr = GetRootAsHeader(b, 0)
+		hdr = GetSizePrefixedRootAsHeader(tbl, 0)
 		numFeatures = hdr.FeaturesCount()
 		nodeSize = hdr.IndexNodeSize()
 	}); err != nil {
@@ -114,14 +129,14 @@ func (r *Reader) Header() (*Header, error) {
 	// an error here, we still return the header in case caller still
 	// wants to interact with it.
 	if numFeatures > math.MaxInt {
-		return hdr, r.toError(fmtErr("header feature count %d exceeds limit of %d features", numFeatures, math.MaxInt))
+		return hdr, r.toErr(fmtErr("header feature count %d exceeds limit of %d features", numFeatures, math.MaxInt))
 	}
 
 	// Check for an invalid index node size. If there's an error here,
 	// we still return the header in case caller wants to interact with
 	// it.
 	if nodeSize == 1 {
-		return hdr, r.toError(textErr("header index node size 1 not allowed"))
+		return hdr, r.toErr(textErr("header index node size 1 not allowed"))
 	}
 
 	// Store feature count and node size.
@@ -137,9 +152,12 @@ func (r *Reader) Header() (*Header, error) {
 	return hdr, nil
 }
 
+// TODO: Write docs.
 func (r *Reader) Index() (*packedrtree.PackedRTree, error) {
 	// Transition into state for reading index.
-	if err := r.toState(afterHeader, beforeIndex); err != nil {
+	if err := r.toState(afterHeader, beforeIndex); err == errUnexpectedState {
+		return nil, r.indexStateErr(r.state)
+	} else if err != nil {
 		return nil, err
 	}
 
@@ -149,14 +167,18 @@ func (r *Reader) Index() (*packedrtree.PackedRTree, error) {
 		return nil, r.toState(beforeIndex, afterIndex)
 	}
 
+	// If we know our underlying reader is seekable, we may cache its
+	// io.Seeker interface.
+	var s io.Seeker
+
 	// This Index() read might be after a Rewind() after a prior Index()
 	// call read and cached the index. In this case, we can seek the
 	// read cursor forward to the data section and return the cached
 	// index.
 	if r.cachedIndex != nil {
-		rs := r.r.(io.Seeker)
-		if _, err := rs.Seek(r.dataOffset, io.SeekStart); err != nil {
-			return nil, r.toError(wrapErr("failed to seek to data section", err))
+		s = r.r.(io.Seeker)
+		if _, err := s.Seek(r.dataOffset, io.SeekStart); err != nil {
+			return nil, r.toErr(wrapErr("failed to seek to data section", err))
 		}
 		if err := r.toState(beforeIndex, afterIndex); err != nil {
 			return nil, err
@@ -169,23 +191,23 @@ func (r *Reader) Index() (*packedrtree.PackedRTree, error) {
 	// state to afterIndex, but, trying to be as lazy as possible, it
 	// doesn't actually seek. Do that now.
 	if r.indexOffset > 0 {
-		rs := r.r.(io.Seeker)
-		if _, err := rs.Seek(r.dataOffset, io.SeekStart); err != nil {
-			return nil, r.toError(wrapErr("failed to seek to index section", err))
+		s = r.r.(io.Seeker)
+		if _, err := s.Seek(r.dataOffset, io.SeekStart); err != nil {
+			return nil, r.toErr(wrapErr("failed to seek to index section", err))
 		}
 	}
 
 	// Since we know that the reader's position is at the start of the
 	// index section, we save this for future reference in case the user
 	// does a Rewind().
-	if err := r.saveIndexOffset(); err != nil {
+	if err := r.saveIndexOffset(s); err != nil {
 		return nil, err
 	}
 
 	// Read the actual index.
 	prt, err := packedrtree.Unmarshal(r.r)
 	if err != nil {
-		return nil, r.toError(wrapErr("failed to read index", err))
+		return nil, r.toErr(wrapErr("failed to read index", err))
 	}
 
 	// Cache the index for use after future Rewind().
@@ -200,14 +222,18 @@ func (r *Reader) Index() (*packedrtree.PackedRTree, error) {
 	return prt, nil
 }
 
+// TODO: Write docs.
 func (r *Reader) IndexSearch(b packedrtree.Box) ([]Feature, error) {
 	// Searches are only allowed if the reader is positioned immediately
 	// after the header, either as a result of a Rewind(), or because of
 	// a successful call to Header() immediately before.
-	if r.state == afterHeader && r.nodeSize == 0 {
-		return nil, ErrNoIndex
-	} else if err := r.toState(afterHeader, beforeIndex); err != nil {
+	if err := r.toState(afterHeader, beforeIndex); err == errUnexpectedState {
+		return nil, r.indexStateErr(r.state)
+	} else if err != nil {
 		return nil, err
+	} else if r.nodeSize == 0 {
+		r.state = afterIndex
+		return nil, ErrNoIndex
 	}
 
 	// Search the index.
@@ -219,20 +245,18 @@ func (r *Reader) IndexSearch(b packedrtree.Box) ([]Feature, error) {
 			// it and seek past the index.
 			sr = r.cachedIndex.Search(b)
 			if _, err := rs.Seek(r.dataOffset, io.SeekCurrent); err != nil {
-				return nil, r.toError(wrapErr("failed to skip past index", err))
+				return nil, r.toErr(wrapErr("failed to skip past index", err))
 			}
 		} else {
 			// Save the index position in case we need to rewind.
-			if err := r.saveIndexOffset(); err != nil {
+			if err := r.saveIndexOffset(rs); err != nil {
 				return nil, err
 			}
 			// Attempt an efficient streaming search without reading
 			// the whole index into memory.
 			var err error
-			if err = r.saveIndexOffset(); err != nil {
-				return nil, err
-			} else if sr, err = packedrtree.Seek(rs, r.numFeatures, r.nodeSize, b); err != nil {
-				return nil, r.toError(wrapErr("failed to seek-search index", err))
+			if sr, err = packedrtree.Seek(rs, r.numFeatures, r.nodeSize, b); err != nil {
+				return nil, r.toErr(wrapErr("failed to seek-search index", err))
 			}
 		}
 	} else if r.cachedIndex == nil {
@@ -258,7 +282,7 @@ func (r *Reader) IndexSearch(b packedrtree.Box) ([]Feature, error) {
 	if err := r.toState(beforeIndex, afterIndex); err != nil {
 		return nil, err
 	}
-	if err := r.saveDataOffset(); err != nil {
+	if err := r.saveDataOffset(rs); err != nil {
 		return nil, err
 	}
 	if err := r.toState(afterIndex, inData); err != nil {
@@ -274,73 +298,89 @@ func (r *Reader) IndexSearch(b packedrtree.Box) ([]Feature, error) {
 			return err
 		}
 	} else {
-		buf := make([]byte, 8096)
+		buf := make([]byte, discardBufferSize)
 		skip = func(n int64) error {
-			for n > 0 {
-				var a int
-				var err error
-				if int(n) < len(buf) {
-					a, err = r.r.Read(buf[0:n])
-				} else {
-					a, err = r.r.Read(buf)
-				}
-				if err != nil {
-					return err
-				}
-				n -= int64(a)
-			}
+			return discard(r.r, buf, n)
 		}
 	}
 
 	// Traverse the data section collecting all the features included
 	// in the search results.
 	fs := make([]Feature, len(sr))
-	var offset int64
 	for i := range sr {
-		if sr[i].Offset > offset {
-			if err := skip(sr[i].Offset - offset); err != nil {
-				return nil, r.toError(wrapErr("failed to skip to feature %d (data offset %d) for search result %d", err, sr[i].RefIndex, sr[i].Offset, i))
+		if sr[i].Offset > r.featureOffset {
+			if err := skip(sr[i].Offset - r.featureOffset); err != nil {
+				return nil, r.toErr(wrapErr("failed to skip to feature %d (data offset %d) for search result %d", err, sr[i].RefIndex, sr[i].Offset, i))
 			}
 		}
-		var size int64
 		var err error
-		if size, err = r.readFeature(&fs[i]); err != nil {
-			return nil, r.toError(wrapErr("failed to read feature %d (data offset %d) for search result %d", err, sr[i].RefIndex, sr[i].Offset))
-		}
 		r.featureIndex = sr[i].RefIndex
-		offset = sr[i].Offset + size
+		r.featureOffset = sr[i].Offset
+		if err = r.readFeature(&fs[i]); err != nil {
+			return nil, err
+		}
+	}
+
+	// Put the reader into EOF state so that it is not possible to make
+	// weird residual calls to Data() or DataAll() from the position of
+	// the last feature read.
+	if err := r.toState(inData, eof); err != nil {
+		return nil, err
 	}
 
 	// All search results are mapped to data features.
 	return fs, nil
-
-	// TODO: Skipping to tne end of the data section seems wrong for the
-	//       slow non seekable case, but otherwise results in a weird
-	//       thing where Data and DataAll can still be called. Should
-	//       have a state for this.
 }
 
+// TODO: Write docs.
 func (r *Reader) Data(p []Feature) (int, error) {
-	if err := r.checkDataState(); err != nil {
-		return 0, err
+	if r.err != nil {
+		return 0, r.err
 	}
+
+	if r.state == afterHeader {
+		if err := r.skipIndex(); err != nil {
+			return 0, err
+		}
+	}
+
+	if r.state == afterIndex {
+		if err := r.saveDataOffset(nil); err != nil {
+			return 0, err
+		}
+		r.state = inData
+	}
+
+	if r.state == eof {
+		return 0, io.EOF
+	}
+
+	if r.state == uninitialized {
+		return 0, errHeaderNotCalled
+	}
+
+	r.sanityCheckState()
+
 	rem := r.numFeatures - r.featureIndex
 	n := len(p)
 	if n > rem {
 		n = rem
 	}
 	for i := 0; i < n; i++ {
-		if _, err := r.readFeature(&p[i]); err != nil {
-			return i, r.toError(wrapErr("failed to read feature %d", err, r.featureIndex))
+		if err := r.readFeature(&p[i]); err != nil {
+			return i, err
 		}
-		r.featureIndex++
 	}
 	if n == rem {
+		if err := r.toState(inData, eof); err != nil {
+			return n, err
+		}
 		return n, io.EOF
 	}
 	return n, nil
 }
 
+// TODO: Write docs.
 func (r *Reader) DataAll() ([]Feature, error) {
 	rem := r.numFeatures - r.featureIndex
 	p := make([]Feature, rem)
@@ -355,15 +395,19 @@ func (r *Reader) DataAll() ([]Feature, error) {
 	return p, nil
 }
 
+// TODO: Write docs.
 func (r *Reader) Rewind() error {
 	if r.err != nil {
 		return r.err
-	} else if r.state < afterHeader {
-		// TODO: Return an appropriate error here.
 	} else if r.state == afterHeader {
 		return nil // No-Op
+	}
+
+	r.sanityCheckState()
+	if r.state < afterHeader {
+		return errHeaderNotCalled
 	} else if r.indexOffset == 0 {
-		return textErr("can't rewind; reader is not an io.Seeker")
+		return textErr("can't rewind: reader is not an io.Seeker")
 	}
 
 	// Reset state to just after reading the header, but lazily do not
@@ -371,21 +415,32 @@ func (r *Reader) Rewind() error {
 	// Data family of methods, as appropriate.
 	r.state = afterHeader
 	r.featureIndex = 0
+	r.featureOffset = 0
 	return nil
 }
 
+// TODO: Write docs.
 func (r *Reader) Close() error { // TODO: Factor part of this into stateful.close()
 	if r.err == nil {
 		return r.err
 	}
 
 	r.err = ErrClosed
+	if c, ok := r.r.(io.Closer); ok {
+		return c.Close()
+	}
 	return nil
 }
 
-func (r *Reader) toState(expected, to readState) error { // TODO: Factor into stateful
+func (r *Reader) sanityCheckState() {
+	if r.state&invalid == invalid {
+		fmtPanic("logic error: invalid state 0x%x", r.state)
+	}
+}
+
+func (r *Reader) toState(expected, to readState) (err error) { // TODO: Factor into stateful
 	// Always fail if the reader's already in the error state.
-	if r.err == nil {
+	if r.err != nil {
 		return r.err
 	}
 
@@ -396,70 +451,162 @@ func (r *Reader) toState(expected, to readState) error { // TODO: Factor into st
 		return nil
 	}
 
-	// TODO: make nice contextual error messages based on the
-	//       expected expected state.
-	//  - As an example if desired state is beforeIndex but position
-	//    is anything after afterHeader, then should return ErrPassedIndex.
-	// - As another example, trying to do DataSearch if anywhere passed
-	//   afterHeader could prompt an error that suggests Rewinding
+	// Check for bad internal state.
+	r.sanityCheckState()
+
+	// Indicate that the state transition is invalid.
+	return errUnexpectedState
 }
 
-func (r *Reader) toError(err error) error {
+func (r *Reader) toErr(err error) error {
 	if r.err != nil {
-		textPanic("already in error state")
+		textPanic("logic error: already in error state")
 	}
 
 	r.err = err
 	return err
 }
 
-func (r *Reader) checkDataState() error {
-	if r.err != nil {
-		return r.err
-	} else if r.state < afterHeader {
-		// TODO: Return an appropriate error here.
-	}
+const errReadPastIndex = "read position is past index"
 
-	if r.state == afterHeader {
-		// TODO: Walk past index.
-		r.state = afterIndex
+func (r *Reader) indexStateErr(state readState) error {
+	switch state {
+	case uninitialized:
+		return errHeaderNotCalled
+	case afterIndex, inData, eof:
+		if r.featureIndex > 0 {
+			return textErr(errReadPastIndex + " (reader is an io.Seeker though, try Rewind)")
+		} else {
+			return textErr(errReadPastIndex)
+		}
+	default:
+		fmtPanic("logic error: unexpected state 0x%x looking for index", state)
+		return nil
 	}
-
-	if r.state == afterIndex {
-		r.saveDataOffset()
-		r.state = inData
-	}
-
-	if r.featureIndex == r.numFeatures {
-		return io.EOF
-	}
-
-	return nil
 }
 
-func (r *Reader) saveIndexOffset() error {
-	return r.saveGenericOffset(&r.indexOffset, "index")
-}
+func (r *Reader) skipIndex() error {
+	// Transition into state for working with index.
+	if err := r.toState(afterHeader, beforeIndex); err != nil {
+		return err
+	}
 
-func (r *Reader) saveDataOffset() error {
-	return r.saveGenericOffset(&r.dataOffset, "data")
-}
-
-func (r *Reader) saveGenericOffset(offsetPtr *int64, name string) error {
-	if *offsetPtr == 0 {
-		if rs, ok := r.r.(io.Seeker); ok {
-			offset, err := rs.Seek(0, io.SeekCurrent)
-			if err != nil {
-				return r.toError(wrapErr("failed to query %s offset", err, name))
+	// Seek or read to the correct position.
+	if r.nodeSize > 0 {
+		if r.dataOffset > 0 { // If we already know the data offset, seek to it.
+			s := r.r.(io.Seeker)
+			if _, err := s.Seek(r.dataOffset, io.SeekStart); err != nil {
+				return r.toErr(err)
 			}
-			*offsetPtr = offset
+		} else if s, ok := r.r.(io.Seeker); ok { // If we can seek past the index, do so.
+			if err := r.saveIndexOffset(s); err != nil {
+				return err
+			}
+			indexSize, err := packedrtree.Size(r.numFeatures, r.nodeSize)
+			if err != nil {
+				return r.toErr(err)
+			}
+			r.dataOffset = r.indexOffset + indexSize
+			if _, err = s.Seek(r.dataOffset, io.SeekStart); err != nil {
+				return r.toErr(err)
+			}
+		} else { // Our only choice is to read past the index.
+			indexSize, err := packedrtree.Size(r.numFeatures, r.nodeSize)
+			if err != nil {
+				return r.toErr(err)
+			}
+			bufSize := discardBufferSize
+			if indexSize < int64(bufSize) {
+				bufSize = int(indexSize)
+			}
+			if err = discard(r.r, make([]byte, bufSize), indexSize); err != nil {
+				return r.toErr(err)
+			}
 		}
 	}
+
+	// We're now in the correct position.
+	return r.toState(beforeIndex, afterIndex)
+}
+
+func (r *Reader) saveIndexOffset(s io.Seeker) error {
+	return r.saveGenericOffset(s, &r.indexOffset, "index")
+}
+
+func (r *Reader) saveDataOffset(s io.Seeker) error {
+	return r.saveGenericOffset(s, &r.dataOffset, "data")
+}
+
+func (r *Reader) saveGenericOffset(s io.Seeker, offsetPtr *int64, name string) error {
+	if *offsetPtr == 0 {
+		if s == nil {
+			if s, _ = r.r.(io.Seeker); s == nil {
+				return nil
+			}
+		}
+		offset, err := s.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return r.toErr(wrapErr("failed to query %s offset", err, name))
+		}
+		*offsetPtr = offset
+	}
 	return nil
 }
 
-func (r *Reader) readFeature(f *Feature) (size int64, err error) {
-	// TODO: Read the size, uint32.
+func (r *Reader) readFeature(f *Feature) (err error) {
+	// Read the feature length, which is a little-endian 32-bit integer.
+	b := make([]byte, 4)
+	if _, err = io.ReadFull(r.r, b); err != nil {
+		return r.toErr(wrapErr("feature[%d] length read error (offset %d)", err, r.featureIndex, r.featureOffset))
+	}
+	featureLen := flatbuffers.GetUint32(b)
+	if featureLen < 4 {
+		return r.toErr(fmtErr("feature[%d] length %d not big enough for FlatBuffer uoffset_t (offset %d)", r.featureIndex, featureLen, r.featureOffset))
+	}
 
-	// TODO: Read the feature.
+	// Read the feature table bytes.
+	tbl := make([]byte, 4+featureLen)
+	copy(tbl, b)
+	if _, err = io.ReadFull(r.r, tbl[4:]); err != nil {
+		return r.toErr(wrapErr("failed to read feature[%d] (offset %d, len=%d)", err, r.featureIndex, r.featureOffset, featureLen))
+	}
+
+	// Read the uoffset_t that prefixes the tables bytes and which tells
+	// us where the data starts.
+	tblOffset := flatbuffers.GetUOffsetT(tbl[4:])
+
+	// Convert the feature table into a size-prefixed FlatBuffer which
+	// is a table of type Feature.
+	f.Init(tbl, 4+tblOffset)
+
+	// Advance the feature index and feature offset.
+	r.featureIndex++
+	r.featureOffset += 4 + int64(featureLen)
+
+	// Successful read of a feature.
+	return nil
+}
+
+// discardBufferSize is the suggested buffer size to use with the
+// discard function.
+const discardBufferSize = 8096
+
+// discard reads and discards n bytes from a reader using the given
+// temporary buffer as a scratch space to read into. At the end of this
+// function, the contents of the buffer are undefined.
+func discard(r io.Reader, buf []byte, n int64) error {
+	for n > 0 {
+		var a int
+		var err error
+		if int(n) < len(buf) {
+			a, err = r.Read(buf[0:n])
+		} else {
+			a, err = r.Read(buf)
+		}
+		if err != nil {
+			return err
+		}
+		n -= int64(a)
+	}
+	return nil
 }

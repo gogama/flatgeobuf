@@ -1,6 +1,8 @@
 package flatgeobuf
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // safeFlatBuffersInteraction runs a function that interacts with
 // FlatBuffers, trapping any panic that occurs and converting it to a

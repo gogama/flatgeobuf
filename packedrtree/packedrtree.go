@@ -2,8 +2,9 @@ package packedrtree
 
 import (
 	"container/heap"
-	"errors"
 	"io"
+	"math"
+	"unsafe"
 )
 
 // A Ref is a single item within the PackedRTree and represents a
@@ -27,6 +28,67 @@ type node struct {
 	Ref
 }
 
+const numNodeBytes = unsafe.Sizeof(node{})
+
+func validateParams(numRefs int, nodeSize uint16) {
+	if numRefs < 1 {
+		textPanic("empty tree not allowed (num refs must be > 0)")
+	} else if nodeSize < 2 {
+		textPanic("node size must be at least 2")
+	}
+}
+
+// Size returns the disk size in bytes of a packed Hilbert R-Tree index
+// having a given feature reference count and node size. Panics if
+// numRefs is less than 1 or nodeSize is less than 2, and returns an
+// error if integer overflow occurs.
+func Size(numRefs int, nodeSize uint16) (int64, error) {
+	validateParams(numRefs, nodeSize)
+	return size(numRefs, int(nodeSize))
+}
+
+// size returns the disk size in bytes of a packed Hilbert R-Tree index
+// having a given feature reference count and node size. Returns an
+// error if integer overflow occurs.
+func size(numRefs, nodeSize int) (int64, error) {
+	// Count total number of internal nodes in the tree.
+	var numInternal int
+	nodesThisLevel := numRefs
+	for {
+		nodesThisLevel = (nodesThisLevel + nodeSize - 1) / nodeSize
+		numInternal += nodesThisLevel
+		if nodesThisLevel == 1 {
+			break
+		}
+	}
+
+	// Calculate total number of nodes, ensuring it does not overflow
+	// int.
+	numNodes, err := totalNodes(numRefs, numInternal)
+	if err != nil {
+		return 0, err
+	}
+
+	// Ensure total tree size does not overflow int64.
+	if int64(numNodes) > math.MaxInt64/int64(numNodeBytes) {
+		return 0, textErr("index size overflows int64")
+	}
+
+	// Calculate and return total tree size.
+	return int64(numNodes) * int64(numNodeBytes), nil
+}
+
+// totalNodes sums numRefs and numInternal, returning an error if
+// integer overflow occurs.
+func totalNodes(numRefs, numInternal int) (n int, err error) {
+	n = numRefs + numInternal
+	if n < numRefs || n < numInternal {
+		n = 0
+		err = textErr("total node count overflows int")
+	}
+	return
+}
+
 // A levelRange represents the range of node indices that comprise a
 // A levelRange represents the range of node indices that comprise a
 // level. Each levelRange is a closed/open node index pair [start, end)
@@ -48,10 +110,10 @@ type levelRange struct {
 // function will be [[3, 7], [1, 3], [0, 1]], where first item in the
 // list represents the leaf node level, and the last item in the list is
 // the root level.
-func levelify(numRefs, nodeSize int) []levelRange {
-	// numNodes is total count of internal and leaf nodes in the tree.
-	// We initialize it with the number of leaf nodes.
-	numNodes := numRefs
+func levelify(numRefs, nodeSize int) ([]levelRange, error) {
+	// numInternal is the number of internal nodes in the tree, a number
+	// strictly less than numRefs.
+	var numInternal int
 
 	// Generate a list of node counts per level, in the same order as
 	// the final levelRange list, i.e. the leaf level 0 is first and the
@@ -65,10 +127,16 @@ func levelify(numRefs, nodeSize int) []levelRange {
 	for {
 		nodesThisLevel = (nodesThisLevel + nodeSize - 1) / nodeSize
 		nodesPerLevel = append(nodesPerLevel, nodesThisLevel)
-		numNodes += nodesThisLevel
+		numInternal += nodesThisLevel
 		if nodesThisLevel == 1 {
 			break
 		}
+	}
+
+	// Sum up the total number of nodes.
+	numNodes, err := totalNodes(numRefs, numInternal)
+	if err != nil {
+		return nil, err
 	}
 
 	// Generate a list of node start indices per level, in the same
@@ -89,7 +157,7 @@ func levelify(numRefs, nodeSize int) []levelRange {
 		levels[i].start = levelIndices[i]
 		levels[i].end = levelIndices[i] + nodesPerLevel[i]
 	}
-	return levels
+	return levels, nil
 }
 
 // A fetchFunc is used to fetch the nodes from the closed/open index
@@ -184,13 +252,12 @@ type packedRTree struct {
 // In the official Flatgeobuf implementations, noo is most analogous to
 // the function or method named init().
 func noo(numRefs int, nodeSize uint16, push pushFunc, pop popFunc, fetch fetchFunc) (packedRTree, error) {
-	if numRefs < 1 {
-		return packedRTree{}, errors.New("packedrtree: empty tree not allowed")
-	} else if nodeSize < 2 {
-		return packedRTree{}, errors.New("packedrtree: node size must be at least 2")
-	}
+	validateParams(numRefs, nodeSize)
 
-	levels := levelify(numRefs, int(nodeSize))
+	levels, err := levelify(numRefs, int(nodeSize))
+	if err != nil {
+		return packedRTree{}, err
+	}
 
 	return packedRTree{
 		numRefs:  numRefs,
@@ -264,7 +331,9 @@ type PackedRTree struct {
 }
 
 // New creates a new packed Hilbert R-Tree from a non-empty,
-// Hilbert-sorted array of feature references.
+// Hilbert-sorted list of feature references and a given R-Tree node
+// size. Panics if the reference list is empty or node size is less than
+// 2.
 //
 // Use HilbertSort to sort the feature references. If the input slice is
 // not Hilbert-sorted, the behavior of the new PackedRTree is undefined.
@@ -286,7 +355,7 @@ func New(refs []Ref, nodeSize uint16) (*PackedRTree, error) {
 		nodeIndex := level.start
 		parent := &prt.nodes[prt.levels[i+1].start]
 		for nodeIndex < level.end {
-			*parent = node{Ref: Ref{Null, nodeIndex}}
+			*parent = node{Ref: Ref{Null, int64(nodeIndex)}}
 			var j int
 			for {
 				parent.expand(&prt.nodes[nodeIndex].Box)
@@ -372,6 +441,7 @@ func Seek(rs io.ReadSeeker, numRefs int, nodeSize uint16, b Box) ([]Result, erro
 	if err != nil {
 		return nil, err
 	}
+
 	// TODO: For this function to work with flatgeobuf.Reader, we should
 	//       ensure that after the index search is finished it seeks to
 	//       the end of the index section, i.e. so that calls to r.Rewind()
