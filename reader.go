@@ -1,12 +1,12 @@
 package flatgeobuf
 
 import (
-	flatbuffers "github.com/google/flatbuffers/go"
 	"io"
 	"math"
 	"sort"
 
 	"github.com/gogama/flatgeobuf/packedrtree"
+	flatbuffers "github.com/google/flatbuffers/go"
 )
 
 // Reader reads an underlying stream as a FlatGeobuf file.
