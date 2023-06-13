@@ -418,18 +418,14 @@ func Unmarshal(r io.Reader) (*PackedRTree, error) {
 // TODO: Docs
 func Seek(rs io.ReadSeeker, numRefs int, nodeSize uint16, b Box) ([]Result, error) {
 	fetch := func(i, j int, nodes []node) error {
-		// TODO: I don't think r needs to be a ReadSeeker with my
-		//       implementation because the reads are all forward, but
-		//       if it is it allows it to jump forward instead of reading
-		//       forward, potentially saving lots of IO. OTOH, we could
-		//       just expect ReadSeeker because someone could wrap any
-		//       sequential access reader in a forward-seekable adapter
-		//       on their own.
+		// TODO: Seek to the position.
 
 		// TODO: Read from the read seeker into nodes
 
 		// TODO: Rust version has a nifty thing where it seeks past the
-		//       remainder of the index at the end. Worth it?
+		//       remainder of the index at the end. Worth it? I think
+		//       so because that's how Seek can be used from Reader
+		//       without messing anything up.
 		//           https://github.com/flatgeobuf/flatgeobuf/blob/master/src/rust/src/packed_r_tree.rs#L532-L535
 		return nil
 	}

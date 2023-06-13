@@ -178,7 +178,7 @@ func (r *Reader) Index() (*packedrtree.PackedRTree, error) {
 	if r.cachedIndex != nil {
 		s = r.r.(io.Seeker)
 		if _, err := s.Seek(r.dataOffset, io.SeekStart); err != nil {
-			return nil, r.toErr(wrapErr("failed to seek to data section", err))
+			return nil, r.toErr(wrapErr("failed to seek past cached index", err))
 		}
 		if err := r.toState(beforeIndex, afterIndex); err != nil {
 			return nil, err
@@ -192,7 +192,7 @@ func (r *Reader) Index() (*packedrtree.PackedRTree, error) {
 	// doesn't actually seek. Do that now.
 	if r.indexOffset > 0 {
 		s = r.r.(io.Seeker)
-		if _, err := s.Seek(r.dataOffset, io.SeekStart); err != nil {
+		if _, err := s.Seek(r.indexOffset, io.SeekStart); err != nil {
 			return nil, r.toErr(wrapErr("failed to seek to index section", err))
 		}
 	}
