@@ -102,7 +102,7 @@ type levelRange struct {
 // deterministically results from a given leaf node count (numRefs) and
 // child node count (nodeSize).
 //
-// In the official Flatgeobuf implementations, levelify is most
+// In the official FlatGeobuf implementations, levelify is most
 // analogous to the function or method named generateLevelBounds().
 //
 // For example, assume numRefs = 4, nodeSize = 2. The output of this
@@ -248,7 +248,7 @@ type packedRTree struct {
 
 // noo constructs a new packedRTree.
 //
-// In the official Flatgeobuf implementations, noo is most analogous to
+// In the official FlatGeobuf implementations, noo is most analogous to
 // the function or method named init().
 func noo(numRefs int, nodeSize uint16, push pushFunc, pop popFunc, fetch fetchFunc) (packedRTree, error) {
 	validateParams(numRefs, nodeSize)
@@ -271,7 +271,7 @@ func noo(numRefs int, nodeSize uint16, push pushFunc, pop popFunc, fetch fetchFu
 
 // Result is a single index search result. A Result's fields can be used
 // to locate the corresponding feature in the main data section of the
-// Flatgeobuf file, or in the Ref list passed to New when creating the
+// FlatGeobuf file, or in the Ref list passed to New when creating the
 // PackedRTree.
 type Result struct {
 	// Offset is the result feature's byte offset into the data section.
@@ -379,7 +379,7 @@ func (prt *PackedRTree) Bounds() Box {
 // Search searches the packed Hilbert R-Tree for qualified matches
 // whose bounding rectangles intersect the query box.
 //
-// To directly search the index section of Flatgeobuf file without
+// To directly search the index section of FlatGeobuf file without
 // creating a PackedRTree, consider using the Seek function.
 func (prt *PackedRTree) Search(b Box) []Result {
 	r, err := prt.search(b)
@@ -389,10 +389,10 @@ func (prt *PackedRTree) Search(b Box) []Result {
 	return r
 }
 
-// Marshal serializes the packed Hilbert R-Tree as a Flatgeobuf index
+// Marshal serializes the packed Hilbert R-Tree as a FlatGeobuf index
 // section.
 //
-// If you are writing a complete Flatgeobuf file, the writer should be
+// If you are writing a complete FlatGeobuf file, the writer should be
 // positioned ready to write the first byte of the index. If this method
 // returns without error, the writer will be positioned ready to write
 // the first byte of the data section.
