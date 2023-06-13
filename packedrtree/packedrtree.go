@@ -90,7 +90,6 @@ func totalNodes(numRefs, numInternal int) (n int, err error) {
 }
 
 // A levelRange represents the range of node indices that comprise a
-// A levelRange represents the range of node indices that comprise a
 // level. Each levelRange is a closed/open node index pair [start, end)
 // where start is the index (into packedRTree's nodes list) of the first
 // node in the level and end is the index that is one past the last node
