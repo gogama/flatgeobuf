@@ -28,7 +28,7 @@ type node struct {
 	Ref
 }
 
-const numNodeBytes = unsafe.Sizeof(node{})
+const numNodeBytes = int(unsafe.Sizeof(node{}))
 
 func validateParams(numRefs int, nodeSize uint16) {
 	if numRefs < 1 {
@@ -81,10 +81,10 @@ func size(numRefs, nodeSize int) (int64, error) {
 // totalNodes sums numRefs and numInternal, returning an error if
 // integer overflow occurs.
 func totalNodes(numRefs, numInternal int) (n int, err error) {
-	n = numRefs + numInternal
-	if n < numRefs || n < numInternal {
-		n = 0
+	if numInternal > math.MaxInt-numRefs {
 		err = textErr("total node count overflows int")
+	} else {
+		n = numRefs + numInternal
 	}
 	return
 }
@@ -417,18 +417,49 @@ func Unmarshal(r io.Reader) (*PackedRTree, error) {
 
 // TODO: Docs
 func Seek(rs io.ReadSeeker, numRefs int, nodeSize uint16, b Box) ([]Result, error) {
+	// Cache the start offset of the index.
+	startOffset, err := rs.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return nil, wrapErr("failed to cache index start offset", err)
+	}
+
+	// Calculate the end offset of the index and check for integer
+	// overflow.
+	sz, err := size(numRefs, int(nodeSize))
+	if err != nil {
+		return nil, err
+	} else if sz > math.MaxInt64-startOffset {
+		return nil, textErr("index end offset overflows int64")
+	}
+	endOffset := startOffset + sz
+
+	// Keep track of current offset.
+	offset := startOffset
+
+	// Define the fetch function for the search.
 	fetch := func(i, j int, nodes []node) error {
-		// TODO: Seek to the position.
+		// Seek to the start of the position to read.
+		rel := startOffset + int64(i)*int64(numNodeBytes) - offset
+		if rel != 0 {
+			offset, err = rs.Seek(rel, io.SeekCurrent)
+			if err != nil {
+				return fmtErr("failed to seek to node %d, rel. offset %d", err, i, rel)
+			}
+		}
 
-		// TODO: Read from the read seeker into nodes
+		// Read the data.
+		err = readLittleEndianNodes(rs, i, j, nodes)
+		if err != nil {
+			return fmtErr("failed to read nodes %d..%d, rel. offset %d", err, i, j, rel)
+		}
 
-		// TODO: Rust version has a nifty thing where it seeks past the
-		//       remainder of the index at the end. Worth it? I think
-		//       so because that's how Seek can be used from Reader
-		//       without messing anything up.
-		//           https://github.com/flatgeobuf/flatgeobuf/blob/master/src/rust/src/packed_r_tree.rs#L532-L535
+		// Update current offset to the end of the range.
+		offset += int64(j-i) * int64(numNodeBytes)
+
+		// Successful fetch.
 		return nil
 	}
+
 	// Construct the private data structure using a min-heap for the
 	// work tracking ticket bag to ensure the index is read
 	// sequentially.
@@ -437,9 +468,31 @@ func Seek(rs io.ReadSeeker, numRefs int, nodeSize uint16, b Box) ([]Result, erro
 		return nil, err
 	}
 
-	// TODO: For this function to work with flatgeobuf.Reader, we should
-	//       ensure that after the index search is finished it seeks to
-	//       the end of the index section, i.e. so that calls to r.Rewind()
-	//       and r.DataSearch() work properly.
-	return prt.search(b)
+	// Search the index.
+	sr, err := prt.search(b)
+	if err != nil {
+		return nil, err
+	}
+
+	// Skip to the end of the index. This ensures that other code
+	// calling Seek, for e.g. flatgeobuf.Reader, can make reasonable
+	// assumptions about the read cursor after a successful search.
+	if endOffset != offset {
+		if _, err = rs.Seek(endOffset, io.SeekStart); err != nil {
+			return nil, wrapErr("failed to skip to end of index after Seek", err)
+		}
+	}
+
+	// Return results of successful search.
+	return sr, nil
+}
+
+func readLittleEndianNodes(r io.Reader, i, j int, nodes []node) error {
+	ptr := (*byte)(unsafe.Pointer(&nodes[0]))
+	b := unsafe.Slice(ptr, j-i*numNodeBytes)
+	if _, err := io.ReadFull(r, b); err != nil {
+		return err
+	}
+	fixLittleEndianOctets(b)
+	return nil
 }
