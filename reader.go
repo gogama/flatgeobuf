@@ -205,7 +205,7 @@ func (r *Reader) Index() (*packedrtree.PackedRTree, error) {
 	}
 
 	// Read the actual index.
-	prt, err := packedrtree.Unmarshal(r.r)
+	prt, err := packedrtree.Unmarshal(r.r, r.numFeatures, r.nodeSize)
 	if err != nil {
 		return nil, r.toErr(wrapErr("failed to read index", err))
 	}
