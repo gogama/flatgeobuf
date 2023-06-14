@@ -11,3 +11,31 @@ func fixLittleEndianOctets(b []byte) {
 		b[i+3], b[i+4] = b[i+4], b[i+3]
 	}
 }
+
+func writeLittleEndianOctets(w io.Writer, p []byte) (n int, err error) {
+	if len(p)%8 != 0 {
+		textPanic("len(p) must be exact multiple of 8")
+	}
+	buf := make([]byte, 8096)
+	for n < len(p) {
+		if len(p)-n < len(buf) {
+			buf = buf[0 : len(p)-n]
+		}
+		for i := 0; i < len(buf); i += 8 {
+			buf[i+0] = p[n+i+7]
+			buf[i+1] = p[n+i+6]
+			buf[i+2] = p[n+i+5]
+			buf[i+3] = p[n+i+4]
+			buf[i+4] = p[n+i+3]
+			buf[i+5] = p[n+i+2]
+			buf[i+6] = p[n+i+1]
+			buf[i+7] = p[n+i+0]
+		}
+		m, err = w.Write(buf)
+		n += m
+		if err != nil {
+			return
+		}
+	}
+	return
+}

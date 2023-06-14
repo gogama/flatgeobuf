@@ -397,26 +397,53 @@ func (prt *PackedRTree) Search(b Box) []Result {
 // returns without error, the writer will be positioned ready to write
 // the first byte of the data section.
 func (prt *PackedRTree) Marshal(w io.Writer) error {
-	// TODO: For now can use encoding/binary's BigEndian to write the byte.
-	// TODO: I would be inclined to use one of the available tricks to
-	//       determine the endianness of the platform. If it already
-	//       BigEndian just do the closest thing to a byte dump, otherwise
-	//       use encoding/binary. Except encoding binary may be ultraslow...
-	//       Maybe there's something else?
-	//
-	// TODO: Another option is to use https://github.com/yalue/native_endian
-	//       but I would be more inclined to borrow its approach (find
-	//       out how it used compile-time build tags to solve endianness).
-	//
+	if w == nil {
+		textPanic("nil writer")
+	}
+	ptr := (*byte)(unsafe.Pointer(&prt.nodes[0]))
+	src := unsafe.Slice(ptr, numNodeBytes*len(prt.nodes))
+	_, err := writeLittleEndianOctets(w, src)
+	return err
 }
 
-func Unmarshal(r io.Reader) (*PackedRTree, error) {
-	// TODO: This will be the opposite of Marshal, in that it will
-	//       read the whole thing including the internal nodes.
+// TODO: Docs.
+func Unmarshal(r io.Reader, numRefs int, nodeSize uint16) (*PackedRTree, error) {
+	// Validate r. numRefs and nodeSize are validated by noo, below.
+	if r == nil {
+		textPanic("nil reader")
+	}
+
+	// Construct the private data structure into which we will read the
+	// tree nodes.
+	prt, err := noo(numRefs, nodeSize, stackPush, stackPop, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Read the raw nodes directly into the private data structure's
+	// nodes slice. If this is a big-endian system, the byte order of
+	// all the numbers will be backward.
+	ptr := (*byte)(unsafe.Pointer(&prt.nodes[0]))
+	dst := unsafe.Slice(ptr, numNodeBytes*len(prt.nodes))
+	if _, err = io.ReadFull(r, dst); err != nil {
+		return nil, err
+	}
+
+	// Convert the little-endian octets read from the source data into
+	// the native byte ordering of the host CPU architecture.
+	fixLittleEndianOctets(dst)
+
+	// Wrap in the public data structure and return.
+	return &PackedRTree{packedRTree: prt}, nil
 }
 
 // TODO: Docs
 func Seek(rs io.ReadSeeker, numRefs int, nodeSize uint16, b Box) ([]Result, error) {
+	// Validate rs. numRefs and nodeSize are validated by noo, below.
+	if rs == nil {
+		textPanic("nil read seeker")
+	}
+
 	// Cache the start offset of the index.
 	startOffset, err := rs.Seek(0, io.SeekCurrent)
 	if err != nil {

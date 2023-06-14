@@ -3,4 +3,10 @@
 
 package packedrtree
 
+import "io"
+
 func fixLittleEndianOctets(_ []byte) {} // No-op since architecture is little-endian.
+
+func writeLittleEndianOctets(w io.Writer, p []byte) (int, error) {
+	return w.Write(p)
+}
