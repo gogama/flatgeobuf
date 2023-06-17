@@ -21,4 +21,4 @@
 go.work
 
 # Flatgeobuf Git repository
-flatgeobuf/
+/flatgeobuf/

@@ -12,3 +12,7 @@ Future directions:
        file and append while updating the feature count in the header.
        This would address the "append without index" use case suggested on the FlatGeobuf
        docs site.
+
+
+TODO in README:
+   Ensure credit is given for testdata/flatgeobuf/*.
