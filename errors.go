@@ -14,7 +14,15 @@ var (
 	ErrClosed = textErr("closed")
 
 	errUnexpectedState = textErr("unexpected state")
-	errHeaderNotCalled = textErr("must call Header")
+)
+
+const (
+	errHeaderNotCalled     = "must call Header()"
+	errHeaderAlreadyCalled = "Header() has already been called"
+	errHeaderNodeSizeZero  = "header node size 0 indicates no index"
+	errIndexNotWritten     = "header requires index but no index written"
+	errReadPastIndex       = "read position is past index"
+	errWritePastIndex      = "write position is past index"
 )
 
 const packageName = "flatgeobuf: "

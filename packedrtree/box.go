@@ -9,6 +9,7 @@ type Box struct {
 	YMax float64
 }
 
+// TODO: EmptyBox is probably a better name.
 var Null = Box{
 	XMin: math.Inf(1),
 	YMin: math.Inf(1),
@@ -32,7 +33,7 @@ func (b *Box) midY() float64 {
 	return (b.YMin + b.YMin) / 2
 }
 
-func (b *Box) expand(c *Box) {
+func (b *Box) Expand(c *Box) {
 	if c.XMin < b.XMin {
 		b.XMin = c.XMin
 	}
@@ -46,6 +47,20 @@ func (b *Box) expand(c *Box) {
 		b.YMax = c.YMax
 	}
 }
+
+func (b *Box) ExpandXY(x, y float64) {
+	if x < b.XMin {
+		b.XMin = x
+	} else if x > b.XMax {
+		b.XMax = x
+	}
+	if y < b.YMin {
+		b.YMin = y
+	} else if y > b.YMax {
+		b.YMax = y
+	}
+}
+
 func (b *Box) intersects(o *Box) bool {
 	if b.XMax < o.XMin {
 		return true

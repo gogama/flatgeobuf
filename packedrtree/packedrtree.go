@@ -357,7 +357,7 @@ func New(refs []Ref, nodeSize uint16) (*PackedRTree, error) {
 			*parent = node{Ref: Ref{Null, int64(nodeIndex)}}
 			var j int
 			for {
-				parent.expand(&prt.nodes[nodeIndex].Box)
+				parent.Expand(&prt.nodes[nodeIndex].Box)
 				j++
 				nodeIndex++
 				if j == prt.nodeSize || nodeIndex == level.end {
@@ -376,6 +376,17 @@ func (prt *PackedRTree) Bounds() Box {
 	return prt.nodes[len(prt.nodes)-1].Box
 }
 
+// NumRefs returns the number of feature references stored in the packed
+// Hilbert R-Tree.
+func (prt *PackedRTree) NumRefs() int {
+	return prt.numRefs
+}
+
+// NodeSize returns the child node count of the packed Hilbert R-Tree.
+func (prt *PackedRTree) NodeSize() uint16 {
+	return uint16(prt.nodeSize)
+}
+
 // Search searches the packed Hilbert R-Tree for qualified matches
 // whose bounding rectangles intersect the query box.
 //
@@ -390,20 +401,20 @@ func (prt *PackedRTree) Search(b Box) []Result {
 }
 
 // Marshal serializes the packed Hilbert R-Tree as a FlatGeobuf index
-// section.
+// section to a writer, returning the number of bytes written.
 //
 // If you are writing a complete FlatGeobuf file, the writer should be
 // positioned ready to write the first byte of the index. If this method
 // returns without error, the writer will be positioned ready to write
 // the first byte of the data section.
-func (prt *PackedRTree) Marshal(w io.Writer) error {
+func (prt *PackedRTree) Marshal(w io.Writer) (n int, err error) {
 	if w == nil {
 		textPanic("nil writer")
 	}
 	ptr := (*byte)(unsafe.Pointer(&prt.nodes[0]))
 	src := unsafe.Slice(ptr, numNodeBytes*len(prt.nodes))
-	_, err := writeLittleEndianOctets(w, src)
-	return err
+	n, err = writeLittleEndianOctets(w, src)
+	return
 }
 
 // TODO: Docs.

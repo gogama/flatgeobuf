@@ -13,8 +13,7 @@ import (
 //
 // TODO: Write docs.
 type Reader struct {
-	state readState // TODO: can probably be factored into a super-struct called stateful
-	err   error     // TODO: can probably be factored into a super-struct named stateful
+	stateful
 	// r is the stream to read from. It may also implement io.Seeker,
 	// enabling a wider range of behaviours, but is not required to.
 	r io.Reader
@@ -38,26 +37,12 @@ type Reader struct {
 	// via the DataSearch() method.
 	cachedIndex *packedrtree.PackedRTree
 	// featureIndex is the index of the next feature to read, a number
-	// in the [0, numFeatures].
+	// in the range [0, numFeatures].
 	featureIndex int
 	// featureOffset is the offset into the data section of the next
 	// feature to read, a non-negative integer.
 	featureOffset int64
 }
-
-type readState int
-
-const (
-	uninitialized readState = 0x00
-	invalid                 = 0x01
-	beforeMagic             = 0x11
-	beforeHeader            = 0x21
-	afterHeader             = 0x22
-	beforeIndex             = 0x31
-	afterIndex              = 0x32
-	inData                  = 0x42
-	eof                     = 0x52
-)
 
 // NewReader creates a new FlatGeobuf reader based on an underlying
 // reader.
@@ -71,8 +56,8 @@ func NewReader(r io.Reader) *Reader {
 // TODO: Write docs.
 func (r *Reader) Header() (*Header, error) {
 	// Transition into state for reading magic number.
-	if err := r.toState(uninitialized, beforeMagic); err != nil {
-		return nil, textErr("Header has already been called")
+	if err := r.toState(uninitialized, beforeMagic); err == errUnexpectedState {
+		return nil, textErr(errHeaderAlreadyCalled)
 	} else if err != nil {
 		return nil, err
 	}
@@ -93,21 +78,21 @@ func (r *Reader) Header() (*Header, error) {
 
 	// Read the header length, which is a little-endian 4-byte unsigned
 	// integer.
-	b := make([]byte, 4)
+	b := make([]byte, flatbuffers.SizeUint32)
 	if _, err = io.ReadFull(r.r, b); err != nil {
 		return nil, r.toErr(wrapErr("header length read error", err))
 	}
 	headerLen := flatbuffers.GetUint32(b)
-	if headerLen < 4 {
+	if headerLen < flatbuffers.SizeUOffsetT {
 		return nil, r.toErr(fmtErr("header length %d not big enough for FlatBuffer uoffset_t", headerLen))
 	} else if headerLen > headerMaxLen {
 		return nil, r.toErr(fmtErr("header length %d exceeds limit of %d bytes", headerLen, headerMaxLen))
 	}
 
 	// Read the header bytes.
-	tbl := make([]byte, 4+headerLen)
+	tbl := make([]byte, flatbuffers.SizeUint32+headerLen)
 	copy(tbl, b)
-	if _, err = io.ReadFull(r.r, tbl[4:]); err != nil {
+	if _, err = io.ReadFull(r.r, tbl[flatbuffers.SizeUint32:]); err != nil {
 		return nil, r.toErr(wrapErr("failed to read header table (len=%d)", err, headerLen))
 	}
 
@@ -116,10 +101,11 @@ func (r *Reader) Header() (*Header, error) {
 	var hdr *Header
 	var numFeatures uint64
 	var nodeSize uint16
-	if err = safeFlatBuffersInteraction(func() {
+	if err = safeFlatBuffersInteraction(func() error {
 		hdr = GetSizePrefixedRootAsHeader(tbl, 0)
 		numFeatures = hdr.FeaturesCount()
 		nodeSize = hdr.IndexNodeSize()
+		return nil
 	}); err != nil {
 		return nil, err
 	}
@@ -356,7 +342,7 @@ func (r *Reader) Data(p []Feature) (int, error) {
 	}
 
 	if r.state == uninitialized {
-		return 0, errHeaderNotCalled
+		return 0, textErr(errHeaderNotCalled)
 	}
 
 	r.sanityCheckState()
@@ -405,7 +391,7 @@ func (r *Reader) Rewind() error {
 
 	r.sanityCheckState()
 	if r.state < afterHeader {
-		return errHeaderNotCalled
+		return textErr(errHeaderNotCalled)
 	} else if r.indexOffset == 0 {
 		return textErr("can't rewind: reader is not an io.Seeker")
 	}
@@ -420,59 +406,14 @@ func (r *Reader) Rewind() error {
 }
 
 // TODO: Write docs.
-func (r *Reader) Close() error { // TODO: Factor part of this into stateful.close()
-	if r.err == nil {
-		return r.err
-	}
-
-	r.err = ErrClosed
-	if c, ok := r.r.(io.Closer); ok {
-		return c.Close()
-	}
-	return nil
+func (r *Reader) Close() error {
+	return r.close(r.r)
 }
 
-func (r *Reader) sanityCheckState() {
-	if r.state&invalid == invalid {
-		fmtPanic("logic error: invalid state 0x%x", r.state)
-	}
-}
-
-func (r *Reader) toState(expected, to readState) (err error) { // TODO: Factor into stateful
-	// Always fail if the reader's already in the error state.
-	if r.err != nil {
-		return r.err
-	}
-
-	// Happy path to state transition is when reader is in the expected
-	// state.
-	if r.state == expected {
-		r.state = to
-		return nil
-	}
-
-	// Check for bad internal state.
-	r.sanityCheckState()
-
-	// Indicate that the state transition is invalid.
-	return errUnexpectedState
-}
-
-func (r *Reader) toErr(err error) error {
-	if r.err != nil {
-		textPanic("logic error: already in error state")
-	}
-
-	r.err = err
-	return err
-}
-
-const errReadPastIndex = "read position is past index"
-
-func (r *Reader) indexStateErr(state readState) error {
+func (r *Reader) indexStateErr(state state) error {
 	switch state {
 	case uninitialized:
-		return errHeaderNotCalled
+		return textErr(errHeaderNotCalled)
 	case afterIndex, inData, eof:
 		if r.featureIndex > 0 {
 			return textErr(errReadPastIndex + " (reader is an io.Seeker though, try Rewind)")
@@ -480,7 +421,7 @@ func (r *Reader) indexStateErr(state readState) error {
 			return textErr(errReadPastIndex)
 		}
 	default:
-		fmtPanic("logic error: unexpected state 0x%x looking for index", state)
+		fmtPanic("logic error: unexpected state 0x%x looking to read index", state)
 		return nil
 	}
 }
@@ -555,29 +496,29 @@ func (r *Reader) saveGenericOffset(s io.Seeker, offsetPtr *int64, name string) e
 
 func (r *Reader) readFeature(f *Feature) (err error) {
 	// Read the feature length, which is a little-endian 32-bit integer.
-	b := make([]byte, 4)
+	b := make([]byte, flatbuffers.SizeUint32)
 	if _, err = io.ReadFull(r.r, b); err != nil {
 		return r.toErr(wrapErr("feature[%d] length read error (offset %d)", err, r.featureIndex, r.featureOffset))
 	}
 	featureLen := flatbuffers.GetUint32(b)
-	if featureLen < 4 {
+	if featureLen < flatbuffers.SizeUOffsetT {
 		return r.toErr(fmtErr("feature[%d] length %d not big enough for FlatBuffer uoffset_t (offset %d)", r.featureIndex, featureLen, r.featureOffset))
 	}
 
 	// Read the feature table bytes.
-	tbl := make([]byte, 4+featureLen)
+	tbl := make([]byte, flatbuffers.SizeUint32+featureLen)
 	copy(tbl, b)
-	if _, err = io.ReadFull(r.r, tbl[4:]); err != nil {
+	if _, err = io.ReadFull(r.r, tbl[flatbuffers.SizeUint32:]); err != nil {
 		return r.toErr(wrapErr("failed to read feature[%d] (offset %d, len=%d)", err, r.featureIndex, r.featureOffset, featureLen))
 	}
 
 	// Read the uoffset_t that prefixes the tables bytes and which tells
 	// us where the data starts.
-	tblOffset := flatbuffers.GetUOffsetT(tbl[4:])
+	tblOffset := flatbuffers.GetUOffsetT(tbl[flatbuffers.SizeUint32:])
 
 	// Convert the feature table into a size-prefixed FlatBuffer which
 	// is a table of type Feature.
-	f.Init(tbl, 4+tblOffset)
+	f.Init(tbl, flatbuffers.SizeUint32+tblOffset)
 
 	// Advance the feature index and feature offset.
 	r.featureIndex++
