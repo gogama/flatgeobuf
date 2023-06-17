@@ -248,7 +248,7 @@ func (w *Writer) Data(f *Feature) (n int, err error) {
 	w.featureIndex++
 
 	// Check for EOF.
-	if w.featureIndex == w.numFeatures {
+	if w.featureIndex == w.numFeatures && w.numFeatures > 0 {
 		err = w.toState(inData, eof)
 	}
 

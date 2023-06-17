@@ -303,10 +303,12 @@ func (r *Reader) IndexSearch(b packedrtree.Box) ([]Feature, error) {
 				return nil, r.toErr(wrapErr("failed to skip to feature %d (data offset %d) for search result %d", err, sr[i].RefIndex, sr[i].Offset, i))
 			}
 		}
-		var err error
 		r.featureIndex = sr[i].RefIndex
 		r.featureOffset = sr[i].Offset
-		if err = r.readFeature(&fs[i]); err != nil {
+		err := r.readFeature(&fs[i])
+		if err == errEndOfData {
+			return nil, r.toErr(wrapErr("data section ends before feature[%d]", io.ErrUnexpectedEOF, r.featureIndex))
+		} else if err != nil {
 			return nil, err
 		}
 	}
@@ -351,13 +353,20 @@ func (r *Reader) Data(p []Feature) (int, error) {
 
 	r.sanityCheckState()
 
-	rem := r.numFeatures - r.featureIndex
 	n := len(p)
-	if n > rem {
-		n = rem
+	var rem int
+	if r.numFeatures > 0 {
+		rem = r.numFeatures - r.featureIndex
+		if n > rem {
+			n = rem
+		}
 	}
 	for i := 0; i < n; i++ {
-		if err := r.readFeature(&p[i]); err != nil {
+		err := r.readFeature(&p[i])
+		if r.numFeatures == 0 && err == errEndOfData {
+			_ = r.toState(inData, eof) // TODO: Fix all these internal toStates to just panic, not return error.
+			return i, io.EOF
+		} else if err != nil {
 			return i, err
 		}
 	}
@@ -501,7 +510,11 @@ func (r *Reader) saveGenericOffset(s io.Seeker, offsetPtr *int64, name string) e
 func (r *Reader) readFeature(f *Feature) (err error) {
 	// Read the feature length, which is a little-endian 32-bit integer.
 	b := make([]byte, flatbuffers.SizeUint32)
-	if _, err = io.ReadFull(r.r, b); err != nil {
+	var n int
+	n, err = io.ReadFull(r.r, b)
+	if err == io.EOF && n == 0 {
+		return errEndOfData
+	} else if err != nil {
 		return r.toErr(wrapErr("feature[%d] length read error (offset %d)", err, r.featureIndex, r.featureOffset))
 	}
 	featureLen := flatbuffers.GetUint32(b)

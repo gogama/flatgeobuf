@@ -17,6 +17,7 @@ var (
 	// a Reader or Writer which has been closed.
 	ErrClosed = textErr("closed")
 
+	errEndOfData       = textErr("end of data section")
 	errUnexpectedState = textErr("unexpected state")
 )
 
