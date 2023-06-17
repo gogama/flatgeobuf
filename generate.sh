@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+# Copyright 2023 The flatgeobuf (Go) Authors. All rights reserved.
+# Use of this source code is governed by an MIT-style
+# license that can be found in the LICENSE file.
+
+
 if ! command -v flatc >/dev/null; then
   >&2 << EOF cat
 error: Flatbuffers compiler not found: flatc
