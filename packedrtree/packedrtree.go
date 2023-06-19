@@ -377,7 +377,7 @@ func New(refs []Ref, nodeSize uint16) (*PackedRTree, error) {
 // Bounds returns the bounding box around all features referenced by the
 // packed Hilbert R-Tree.
 func (prt *PackedRTree) Bounds() Box {
-	return prt.nodes[len(prt.nodes)-1].Box
+	return prt.nodes[0].Box
 }
 
 // NumRefs returns the number of feature references stored in the packed
