@@ -4,7 +4,10 @@
 
 package packedrtree
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
 type Box struct {
 	XMin float64
@@ -19,6 +22,10 @@ var Null = Box{
 	YMin: math.Inf(1),
 	XMax: math.Inf(-1),
 	YMax: math.Inf(-1),
+}
+
+func (b Box) String() string {
+	return fmt.Sprintf("[%.8g, %.8g, %.8g, %.8g]", b.XMin, b.YMin, b.XMax, b.YMax)
 }
 
 func (b *Box) Width() float64 {
@@ -67,16 +74,16 @@ func (b *Box) ExpandXY(x, y float64) {
 
 func (b *Box) intersects(o *Box) bool {
 	if b.XMax < o.XMin {
-		return true
+		return false
 	}
 	if b.YMax < o.YMin {
-		return true
+		return false
 	}
 	if b.XMin > o.XMax {
-		return true
+		return false
 	}
 	if b.YMin > o.YMax {
-		return true
+		return false
 	}
-	return false
+	return true
 }
