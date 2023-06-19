@@ -227,7 +227,7 @@ func (r *Reader) IndexSearch(b packedrtree.Box) ([]Feature, error) {
 	}
 
 	// Search the index.
-	var sr []packedrtree.Result
+	var sr packedrtree.Results
 	var rs io.ReadSeeker
 	if rs, _ = r.r.(io.ReadSeeker); rs != nil {
 		if r.cachedIndex != nil {
@@ -262,9 +262,7 @@ func (r *Reader) IndexSearch(b packedrtree.Box) ([]Feature, error) {
 	// If the search results did not come from streaming search, sort
 	// them so their offsets are in file order.
 	if r.cachedIndex != nil {
-		sort.Slice(sr, func(i, j int) bool {
-			return sr[i].Offset < sr[j].Offset
-		})
+		sort.Sort(sr)
 	}
 
 	// The reader's read cursor is now past the index and at the

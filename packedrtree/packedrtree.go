@@ -285,13 +285,37 @@ type Result struct {
 	RefIndex int
 }
 
+// Results is a slice of Result structures which implements
+// sort.Interface. The sort.Sort function will sort Results in
+// ascending order of Result.Offset.
+type Results []Result
+
+// Len returns the length of the slice. It implements the corresponding
+// method of sort.Interface.
+func (rs Results) Len() int {
+	return len(rs)
+}
+
+// Less establishes an absolute ordering by ascending order of
+// Result.Offset. It implements the corresponding method of
+// sort.Interface.
+func (rs Results) Less(i, j int) bool {
+	return rs[i].Offset < rs[j].Offset
+}
+
+// Swap swaps two elements of the slice. It implements the corresponding
+// method of sort.Interface.
+func (rs Results) Swap(i, j int) {
+	rs[i], rs[j] = rs[j], rs[i]
+}
+
 // search implements a generic Hilbert R-Tree search function which is
 // capable of streaming search depending on the callback functions
 // configured in prt.
-func (prt *packedRTree) search(b Box) ([]Result, error) {
+func (prt *packedRTree) search(b Box) (Results, error) {
 	q := make(ticketBag, 1)
 	q[0] = ticket{nodeIndex: 0, level: len(prt.levels) - 1}
-	r := make([]Result, 0)
+	r := make(Results, 0)
 
 	for {
 		// Pop the next work ticket from the front of queue.
@@ -392,11 +416,12 @@ func (prt *PackedRTree) NodeSize() uint16 {
 }
 
 // Search searches the packed Hilbert R-Tree for qualified matches
-// whose bounding rectangles intersect the query box.
+// whose bounding rectangles intersect the query box. The order of the
+// search results is not defined.
 //
 // To directly search the index section of FlatGeobuf file without
 // creating a PackedRTree, consider using the Seek function.
-func (prt *PackedRTree) Search(b Box) []Result {
+func (prt *PackedRTree) Search(b Box) Results {
 	r, err := prt.search(b)
 	if err != nil {
 		panic(err) // prt.search should never return error in this case.
