@@ -15,11 +15,11 @@ func textErr(text string) error {
 	return errors.New(packageName + text)
 }
 
-func fmtErr(format string, a ...interface{}) error { // TODO: Delete if unused
+func fmtErr(format string, a ...interface{}) error {
 	return fmt.Errorf(packageName+format, a...)
 }
 
-func wrapErr(text string, err error, a ...interface{}) error { // TODO: Delete if unused
+func wrapErr(text string, err error, a ...interface{}) error {
 	return fmt.Errorf(packageName+text+": %w", append(a, err)...)
 }
 
@@ -27,6 +27,6 @@ func textPanic(text string) {
 	panic(packageName + text)
 }
 
-func fmtPanic(format string, a ...interface{}) { // TODO: Delete if unused
+func fmtPanic(format string, a ...interface{}) {
 	panic(fmt.Sprintf(packageName+format, a...))
 }

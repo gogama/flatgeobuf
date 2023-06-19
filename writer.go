@@ -172,7 +172,7 @@ func (w *Writer) IndexDataPtr(data []*Feature) (n int, err error) {
 
 	// Create index.
 	refs := make([]packedrtree.Ref, len(data))
-	bounds := packedrtree.Null
+	bounds := packedrtree.EmptyBox
 	var i int
 	err = safeFlatBuffersInteraction(func() error {
 		var offset int64
@@ -308,7 +308,7 @@ func (w *Writer) canWriteData() error {
 }
 
 func featureBounds(b *packedrtree.Box, f *Feature) error {
-	*b = packedrtree.Null
+	*b = packedrtree.EmptyBox
 	return safeFlatBuffersInteraction(func() error {
 		var g Geometry
 		if f.Geometry(&g) != nil {

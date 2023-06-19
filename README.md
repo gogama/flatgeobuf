@@ -15,4 +15,6 @@ Future directions:
 
 
 TODO in README:
-   Ensure credit is given for testdata/flatgeobuf/*.
+   1. Ensure credit is given for testdata/flatgeobuf/*.
+   2. Ensure credit is given for FlatGeobuf format and schema FBS.
+   3. Generally ensure attribution of all the things.

@@ -70,7 +70,6 @@ func HilbertSort(refs []Ref, bounds *Box) {
 //     required and the smaller data size may theoretically result in
 //     memory/bandwidth/cache benefits at the CPU levelRange, maybe.
 func hilbertOfCenter(b *Box, ex, ey, ew, eh float64) uint32 {
-	// FIXME: Sort out the correct name and type for b.
 	var hx uint32 // Hilbert X-coordinate between 0 and hilbertMax
 	if ew != 0.0 {
 		rx := (b.midX() - ex) / ew

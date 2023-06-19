@@ -17,7 +17,7 @@ func fixLittleEndianOctets(b []byte) {
 
 func writeLittleEndianOctets(w io.Writer, p []byte) (n int, err error) {
 	if len(p)%8 != 0 {
-		textPanic("len(p) must be exact multiple of 8")
+		fmtPanic("len(p) must be exact multiple of 8, but is %d", len(p))
 	}
 	buf := make([]byte, 8096)
 	for n < len(p) {

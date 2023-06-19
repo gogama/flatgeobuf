@@ -382,7 +382,7 @@ func New(refs []Ref, nodeSize uint16) (*PackedRTree, error) {
 		nodeIndex := level.start
 		parent := &prt.nodes[prt.levels[i+1].start]
 		for nodeIndex < level.end {
-			*parent = node{Ref: Ref{Null, int64(nodeIndex)}}
+			*parent = node{Ref: Ref{EmptyBox, int64(nodeIndex)}}
 			var j int
 			for {
 				parent.Expand(&prt.nodes[nodeIndex].Box)
