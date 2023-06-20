@@ -234,12 +234,18 @@ func (r *Reader) IndexSearch(b packedrtree.Box) ([]Feature, error) {
 			// If the index was cached by a prior call to Index(), reuse
 			// it and seek past the index.
 			sr = r.cachedIndex.Search(b)
-			if _, err := rs.Seek(r.dataOffset, io.SeekCurrent); err != nil {
+			if _, err := rs.Seek(r.dataOffset, io.SeekStart); err != nil {
 				return nil, r.toErr(wrapErr("failed to skip past index", err))
 			}
 		} else {
-			// Save the index position in case we need to rewind.
-			if err := r.saveIndexOffset(rs); err != nil {
+			// If we've already saved the index offset, seek there.
+			// Otherwise, save the index position in case we need to
+			// rewind in the future.
+			if r.indexOffset > 0 {
+				if _, err := rs.Seek(r.indexOffset, io.SeekStart); err != nil {
+					return nil, r.toErr(wrapErr("failed to seek to index start", err))
+				}
+			} else if err := r.saveIndexOffset(rs); err != nil {
 				return nil, err
 			}
 			// Attempt an efficient streaming search without reading
@@ -312,7 +318,7 @@ func (r *Reader) IndexSearch(b packedrtree.Box) ([]Feature, error) {
 	}
 
 	// Put the reader into EOF state so that it is not possible to make
-	// weird residual calls to Data() or DataAll() from the position of
+	// weird residual calls to Data() or DataRem() from the position of
 	// the last feature read.
 	if err := r.toState(inData, eof); err != nil {
 		return nil, err
@@ -378,7 +384,7 @@ func (r *Reader) Data(p []Feature) (int, error) {
 }
 
 // TODO: Write docs.
-func (r *Reader) DataAll() ([]Feature, error) {
+func (r *Reader) DataRem() ([]Feature, error) {
 	rem := r.numFeatures - r.featureIndex
 	p := make([]Feature, rem)
 	n, err := r.Data(p)
