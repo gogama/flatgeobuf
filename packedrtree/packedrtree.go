@@ -555,8 +555,8 @@ func Seek(rs io.ReadSeeker, numRefs int, nodeSize uint16, b Box) ([]Result, erro
 }
 
 func readLittleEndianNodes(r io.Reader, i, j int, nodes []node) error {
-	ptr := (*byte)(unsafe.Pointer(&nodes[0]))
-	b := unsafe.Slice(ptr, j-i*numNodeBytes)
+	ptr := (*byte)(unsafe.Pointer(&nodes[i]))
+	b := unsafe.Slice(ptr, (j-i)*numNodeBytes)
 	if _, err := io.ReadFull(r, b); err != nil {
 		return err
 	}
