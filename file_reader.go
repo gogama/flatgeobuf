@@ -13,10 +13,10 @@ import (
 	flatbuffers "github.com/google/flatbuffers/go"
 )
 
-// Reader reads an underlying stream as a FlatGeobuf file.
+// FileReader reads an underlying stream as a FlatGeobuf file.
 //
 // TODO: Write docs.
-type Reader struct {
+type FileReader struct {
 	stateful
 	// r is the stream to read from. It may also implement io.Seeker,
 	// enabling a wider range of behaviours, but is not required to.
@@ -48,17 +48,17 @@ type Reader struct {
 	featureOffset int64
 }
 
-// NewReader creates a new FlatGeobuf reader based on an underlying
+// NewFileReader creates a new FlatGeobuf reader based on an underlying
 // reader.
-func NewReader(r io.Reader) *Reader {
+func NewFileReader(r io.Reader) *FileReader {
 	if r == nil {
 		textPanic("nil reader")
 	}
-	return &Reader{r: r}
+	return &FileReader{r: r}
 }
 
 // TODO: Write docs.
-func (r *Reader) Header() (*Header, error) {
+func (r *FileReader) Header() (*Header, error) {
 	// Transition into state for reading magic number.
 	if err := r.toState(uninitialized, beforeMagic); err == errUnexpectedState {
 		return nil, textErr(errHeaderAlreadyCalled)
@@ -119,7 +119,7 @@ func (r *Reader) Header() (*Header, error) {
 	// an error here, we still return the header in case caller still
 	// wants to interact with it.
 	if numFeatures > math.MaxInt {
-		return hdr, r.toErr(fmtErr("header feature count %d exceeds limit of %d features", numFeatures, math.MaxInt))
+		return hdr, r.toErr(fmtErr("header feature count %d overflows limit of %d features", numFeatures, math.MaxInt))
 	}
 
 	// Check for an invalid index node size. If there's an error here,
@@ -143,7 +143,7 @@ func (r *Reader) Header() (*Header, error) {
 }
 
 // TODO: Write docs.
-func (r *Reader) Index() (*packedrtree.PackedRTree, error) {
+func (r *FileReader) Index() (*packedrtree.PackedRTree, error) {
 	// Transition into state for reading index.
 	if err := r.toState(afterHeader, beforeIndex); err == errUnexpectedState {
 		return nil, r.indexStateErr(r.state)
@@ -213,7 +213,7 @@ func (r *Reader) Index() (*packedrtree.PackedRTree, error) {
 }
 
 // TODO: Write docs.
-func (r *Reader) IndexSearch(b packedrtree.Box) ([]Feature, error) {
+func (r *FileReader) IndexSearch(b packedrtree.Box) ([]Feature, error) {
 	// Searches are only allowed if the reader is positioned immediately
 	// after the header, either as a result of a Rewind(), or because of
 	// a successful call to Header() immediately before.
@@ -329,7 +329,7 @@ func (r *Reader) IndexSearch(b packedrtree.Box) ([]Feature, error) {
 }
 
 // TODO: Write docs.
-func (r *Reader) Data(p []Feature) (int, error) {
+func (r *FileReader) Data(p []Feature) (int, error) {
 	if r.err != nil {
 		return 0, r.err
 	}
@@ -384,7 +384,7 @@ func (r *Reader) Data(p []Feature) (int, error) {
 }
 
 // TODO: Write docs.
-func (r *Reader) DataRem() ([]Feature, error) {
+func (r *FileReader) DataRem() ([]Feature, error) {
 	rem := r.numFeatures - r.featureIndex
 	p := make([]Feature, rem)
 	n, err := r.Data(p)
@@ -399,7 +399,7 @@ func (r *Reader) DataRem() ([]Feature, error) {
 }
 
 // TODO: Write docs.
-func (r *Reader) Rewind() error {
+func (r *FileReader) Rewind() error {
 	if r.err != nil {
 		return r.err
 	} else if r.state == afterHeader {
@@ -423,11 +423,11 @@ func (r *Reader) Rewind() error {
 }
 
 // TODO: Write docs.
-func (r *Reader) Close() error {
+func (r *FileReader) Close() error {
 	return r.close(r.r)
 }
 
-func (r *Reader) indexStateErr(state state) error {
+func (r *FileReader) indexStateErr(state state) error {
 	switch state {
 	case uninitialized:
 		return textErr(errHeaderNotCalled)
@@ -443,7 +443,7 @@ func (r *Reader) indexStateErr(state state) error {
 	}
 }
 
-func (r *Reader) skipIndex() error {
+func (r *FileReader) skipIndex() error {
 	// Transition into state for working with index.
 	if err := r.toState(afterHeader, beforeIndex); err != nil {
 		return err
@@ -487,15 +487,15 @@ func (r *Reader) skipIndex() error {
 	return r.toState(beforeIndex, afterIndex)
 }
 
-func (r *Reader) saveIndexOffset(s io.Seeker) error {
+func (r *FileReader) saveIndexOffset(s io.Seeker) error {
 	return r.saveGenericOffset(s, &r.indexOffset, "index")
 }
 
-func (r *Reader) saveDataOffset(s io.Seeker) error {
+func (r *FileReader) saveDataOffset(s io.Seeker) error {
 	return r.saveGenericOffset(s, &r.dataOffset, "data")
 }
 
-func (r *Reader) saveGenericOffset(s io.Seeker, offsetPtr *int64, name string) error {
+func (r *FileReader) saveGenericOffset(s io.Seeker, offsetPtr *int64, name string) error {
 	if *offsetPtr == 0 {
 		if s == nil {
 			if s, _ = r.r.(io.Seeker); s == nil {
@@ -511,7 +511,7 @@ func (r *Reader) saveGenericOffset(s io.Seeker, offsetPtr *int64, name string) e
 	return nil
 }
 
-func (r *Reader) readFeature(f *Feature) (err error) {
+func (r *FileReader) readFeature(f *Feature) (err error) {
 	// Read the feature length, which is a little-endian 32-bit integer.
 	b := make([]byte, flatbuffers.SizeUint32)
 	var n int

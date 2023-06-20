@@ -10,8 +10,7 @@ Mandatory now:
       This will clean up the code and output of the example tests... 
 
 Work to be done:
-    1) Rename Reader/Writer to FileReader/FileWriter and use file_reader.go, file_writer.go.
-    2) Create PropReader, PropWriter in prop_reader.go, prop_writer.go
+done    2) Create PropReader, PropWriter in prop_reader.go, prop_writer.go
             Reader: always takes a schema.
                         Has methods like ReadJSON(col int), ReadInt(col int).
                         Also has ReadRem() -> []PropValue where prop value is struct { ColIndex int, Col *Column, Value interface{} }
@@ -34,3 +33,7 @@ TODO in README:
    1. Ensure credit is given for testdata/flatgeobuf/*.
    2. Ensure credit is given for FlatGeobuf format and schema FBS.
    3. Generally ensure attribution of all the things.
+
+TODO:
+    1. If I'm committing to Go 1.20 due to unsafe.String, then replace
+       all interface{} with any.

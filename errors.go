@@ -14,7 +14,7 @@ var (
 	// on a FlatGeobuf file which does not contain an index.
 	ErrNoIndex = textErr("no index")
 	// ErrClosed is returned when attempting to perform an operation on
-	// a Reader or Writer which has been closed.
+	// a FileReader or FileWriter which has been closed.
 	ErrClosed = textErr("closed")
 
 	errEndOfData       = textErr("end of data section")

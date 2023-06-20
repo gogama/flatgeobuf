@@ -10,8 +10,8 @@ import (
 	"math"
 )
 
-// Writer writes a FlatGeobuf file to an underlying stream.
-type Writer struct {
+// FileWriter writes a FlatGeobuf file to an underlying stream.
+type FileWriter struct {
 	stateful
 	// w is the stream to write to.
 	w io.Writer
@@ -27,11 +27,11 @@ type Writer struct {
 }
 
 // TODO: Docs
-func NewWriter(w io.Writer) *Writer {
+func NewFileWriter(w io.Writer) *FileWriter {
 	if w == nil {
 		textPanic("nil writer")
 	}
-	return &Writer{w: w}
+	return &FileWriter{w: w}
 }
 
 // TODO: Docs
@@ -41,9 +41,9 @@ func NewWriter(w io.Writer) *Writer {
 //		a table what it's size is, and it might not even be contiguous
 //		in the buffer. THEREFORE, we require that the incoming table
 //		be a size-prefixed ROOT table existing at offset 0 in the buffer,
-//	 which is of course true of what our Reader returns, but is not
+//	 which is of course true of what our FileReader returns, but is not
 //	 generally true.
-func (w *Writer) Header(h *Header) (n int, err error) {
+func (w *FileWriter) Header(h *Header) (n int, err error) {
 	// Minimally validate incoming pointer.
 	if h == nil {
 		textPanic("nil header")
@@ -120,14 +120,14 @@ func (w *Writer) Header(h *Header) (n int, err error) {
 }
 
 // TODO: Docs
-func (w *Writer) Index(index *packedrtree.PackedRTree) (n int, err error) {
+func (w *FileWriter) Index(index *packedrtree.PackedRTree) (n int, err error) {
 	if err = w.canWriteIndex(); err != nil {
 		return
 	}
 	return w.index(index)
 }
 
-func (w *Writer) index(index *packedrtree.PackedRTree) (n int, err error) {
+func (w *FileWriter) index(index *packedrtree.PackedRTree) (n int, err error) {
 	// Transition into state for writing index.
 	w.state = beforeIndex
 
@@ -155,7 +155,7 @@ func (w *Writer) index(index *packedrtree.PackedRTree) (n int, err error) {
 }
 
 // TODO: Docs
-func (w *Writer) IndexData(data []Feature) (n int, err error) {
+func (w *FileWriter) IndexData(data []Feature) (n int, err error) {
 	dataPtr := make([]*Feature, len(data))
 	for i := range data {
 		dataPtr[i] = &data[i]
@@ -164,7 +164,7 @@ func (w *Writer) IndexData(data []Feature) (n int, err error) {
 }
 
 // TODO: Docs
-func (w *Writer) IndexDataPtr(data []*Feature) (n int, err error) {
+func (w *FileWriter) IndexDataPtr(data []*Feature) (n int, err error) {
 	// Verify state.
 	if err = w.canWriteIndex(); err != nil {
 		return
@@ -223,7 +223,7 @@ func (w *Writer) IndexDataPtr(data []*Feature) (n int, err error) {
 // TODO: Same issue as affecting Header and the IndexData* methods affects us
 //
 //	here: feature has to be a size-prefixed root table at offset 0
-func (w *Writer) Data(f *Feature) (n int, err error) {
+func (w *FileWriter) Data(f *Feature) (n int, err error) {
 	// Minimally validate incoming pointer.
 	if f == nil {
 		textPanic("nil feature")
@@ -257,7 +257,7 @@ func (w *Writer) Data(f *Feature) (n int, err error) {
 }
 
 // TODO: Docs
-func (w *Writer) Close() error {
+func (w *FileWriter) Close() error {
 	if err := w.close(w.w); err != nil {
 		return err
 	} else if w.featureIndex < w.numFeatures {
@@ -267,7 +267,7 @@ func (w *Writer) Close() error {
 	}
 }
 
-func (w *Writer) canWriteIndex() error {
+func (w *FileWriter) canWriteIndex() error {
 	if w.err != nil {
 		return w.err
 	}
@@ -286,7 +286,7 @@ func (w *Writer) canWriteIndex() error {
 	return nil
 }
 
-func (w *Writer) canWriteData() error {
+func (w *FileWriter) canWriteData() error {
 	if w.err != nil {
 		return w.err
 	}

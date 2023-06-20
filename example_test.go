@@ -19,7 +19,7 @@ func ExampleReader_Empty_File() {
 	}
 	defer f.Close()
 
-	r := flatgeobuf.NewReader(f)
+	r := flatgeobuf.NewFileReader(f)
 	hdr, err := r.Header()
 	if err != nil {
 		panic(err)
@@ -44,7 +44,7 @@ func ExampleReader_Materialized_Index() {
 	}
 	defer f.Close()
 
-	r := flatgeobuf.NewReader(f)
+	r := flatgeobuf.NewFileReader(f)
 	hdr, err := r.Header()
 	if err != nil {
 		panic(err)
@@ -68,17 +68,15 @@ func ExampleReader_Materialized_Index() {
 	if len(results) > 0 {
 		sort.Sort(results)
 		data := make([]flatgeobuf.Feature, results[0].RefIndex+1)
-		n, err := r.Data(data)
-		fmt.Printf("Data -> { n = %d, err = %v }\n", n, err)
+		n, _ := r.Data(data) // Ignoring error to simplify example only.
 		if n > results[0].RefIndex {
-			fmt.Printf("First Result's property bytes -> %q\n", data[results[0].RefIndex].PropertiesBytes())
+			fmt.Printf("First Result: %s\n", data[results[0].RefIndex].StringSchema(hdr))
 		}
 	}
 	// Output: Header -> { FeaturesCount = 179, IndexNodeSize = 16, Title = "" }
 	// Index -> { Bounds = [-180, -85.609038, 180, 83.64513], NumRefs = 179, NodeSize = 16 }
 	// Results -> [{Offset:160424 RefIndex:165}]
-	// Data -> { n = 166, err = <nil> }
-	// First Result's property bytes -> "\x00\x00\x03\x00\x00\x00USA\x01\x00\x18\x00\x00\x00United States of America"
+	// First Result: Feature{Geometry:{Type:MultiPolygon,Bounds:[-171.79111, 18.91619, -66.96466, 71.357764]},Properties:{id:USA,name:United States of America}}
 }
 
 func ExampleReader_Streaming_Search() {
@@ -88,7 +86,7 @@ func ExampleReader_Streaming_Search() {
 	}
 	defer f.Close()
 
-	r := flatgeobuf.NewReader(f)
+	r := flatgeobuf.NewFileReader(f)
 	hdr, err := r.Header()
 	if err != nil {
 		panic(err)
@@ -104,7 +102,7 @@ func ExampleReader_Streaming_Search() {
 	}); err != nil || len(features) == 0 {
 		panic(fmt.Sprintf("err=  %v, len(features) = %d", err, len(features)))
 	}
-	fmt.Printf("First search: %s (%q)\n", features[0].Geometry(&flatgeobuf.Geometry{}).Type(), features[0].PropertiesBytes())
+	fmt.Printf("First search, first Result: %s\n", features[0].StringSchema(hdr))
 
 	// Rewind.
 	if err = r.Rewind(); err != nil {
@@ -118,11 +116,11 @@ func ExampleReader_Streaming_Search() {
 	}); err != nil || len(features) == 0 {
 		panic(fmt.Sprintf("err=  %v, len(features) = %d", err, len(features)))
 	}
-	fmt.Printf("Second search: %s (%q)\n", features[0].Geometry(&flatgeobuf.Geometry{}).Type(), features[0].PropertiesBytes())
+	fmt.Printf("Second search, first Result: %s\n", features[0].StringSchema(hdr))
 
 	// Output: Header -> { FeaturesCount = 3221, IndexNodeSize = 16, Title = "" }
-	// First search: MultiPolygon ("\x00\x00\x02\x00\x00\x0017\x01\x00\x03\x00\x00\x00031\x02\x00\x05\x00\x00\x0017031\x03\x00\x02\x00\x00\x00IL\x04\x00\x04\x00\x00\x00Cook\x05\x00\x06\x00\x00\x00County")
-	// Second search: MultiPolygon ("\x00\x00\x02\x00\x00\x0004\x01\x00\x03\x00\x00\x00013\x02\x00\x05\x00\x00\x0004013\x03\x00\x02\x00\x00\x00AZ\x04\x00\b\x00\x00\x00Maricopa\x05\x00\x06\x00\x00\x00County")
+	// First search, first Result: Feature{Geometry:{Type:MultiPolygon,Bounds:[-88.263572, 41.469555, -87.524044, 42.154265]},Properties:{STATE_FIPS:17,COUNTY_FIP:031,FIPS:17031,STATE:IL,NAME:Cook,LSAD:County}}
+	// Second search, first Result: Feature{Geometry:{Type:MultiPolygon,Bounds:[-113.33438, 32.504938, -111.03991, 34.04817]},Properties:{STATE_FIPS:04,COUNTY_FIP:013,FIPS:04013,STATE:AZ,NAME:Maricopa,LSAD:County}}
 }
 
 func ExampleReader_Unknown_Feature_Count() {
