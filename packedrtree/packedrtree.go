@@ -452,7 +452,16 @@ func (prt *PackedRTree) Marshal(w io.Writer) (n int, err error) {
 	return
 }
 
-// TODO: Docs.
+// Unmarshal deserializes a stream from the FlatGeobuf index section
+// format, returning the in-memory search tree built from the stream.
+//
+// If you are reading from a FlatGeobuf file, the reader should be
+// positioned ready to read the first byte of the index section. If this
+// function returns without error, the reader will be positioned ready
+// to read the first byte of the data section.
+//
+// The Seek function can be used to search an on-disk or in-storage
+// representation of the index without needing to unmarshal it.
 func Unmarshal(r io.Reader, numRefs int, nodeSize uint16) (*PackedRTree, error) {
 	// Validate r. numRefs and nodeSize are validated by noo, below.
 	if r == nil {
@@ -483,7 +492,15 @@ func Unmarshal(r io.Reader, numRefs int, nodeSize uint16) (*PackedRTree, error) 
 	return &PackedRTree{packedRTree: prt}, nil
 }
 
-// TODO: Docs
+// Seek searches the serialized representation of a packed Hilbert
+// R-Tree index directly from a seekable stream without needing to
+// Unmarshal the index into an in-memory data structure. Seek returns
+// all qualified matches whose bounding boxes intersect the query box.
+//
+// The seekable reader should be positioned ready to read the first byte
+// of the FlatGeobuf index section. If this function returns without
+// error, the seekable reader will be positioned ready to read the first
+// byte of the data section.
 func Seek(rs io.ReadSeeker, numRefs int, nodeSize uint16, b Box) ([]Result, error) {
 	// Validate rs. numRefs and nodeSize are validated by noo, below.
 	if rs == nil {
