@@ -12,10 +12,131 @@ import (
 	"github.com/gogama/flatgeobuf/packedrtree"
 )
 
+// String returns a string summarizing the Header fields. The returned
+// value is a summary and not meant to be exhaustive.
+func (h *Header) String() string {
+	var b strings.Builder
+	b.WriteString("Header{")
+	if err := safeFlatBuffersInteraction(func() error {
+		stringBytes(&b, "Name", h.Name())
+		stringEnvelope(&b, h)
+		stringStr(&b, ",Type", h.GeometryType().String())
+		stringFlags(&b, h.HasZ(), h.HasM(), h.HasT(), h.HasTm())
+		stringInt64(&b, ",NumColumns", int64(h.ColumnsLength()))
+		stringUint64(&b, ",NumFeatures", h.FeaturesCount())
+		nodeSize := h.IndexNodeSize()
+		if nodeSize > 0 {
+			stringUint64(&b, ",NodeSize", uint64(nodeSize))
+		} else {
+			fmt.Fprint(&b, "NO INDEX")
+		}
+		var crs Crs
+		stringKey(&b, ",CRS")
+		if h.Crs(&crs) != nil {
+			b.WriteByte('{')
+			stringBytes(&b, "Org", crs.Org())
+			stringInt64(&b, ",Code", int64(crs.Code()))
+			stringBytes(&b, ",Name", crs.Name())
+			wkt := crs.Wkt()
+			stringKey(&b, ",WKT")
+			if wkt == nil {
+				b.WriteString("<nil>")
+			} else {
+				fmt.Fprintf(&b, "%d bytes", len(wkt))
+			}
+			stringBytes(&b, ",CodeString", crs.CodeString())
+			b.WriteByte('}')
+		} else {
+			b.WriteString("<nil>")
+		}
+		stringBytes(&b, ",Title", h.Title())
+		stringBytes(&b, ",Desc", h.Description())
+		stringBytes(&b, ",Meta", h.Metadata())
+		return nil
+	}); err != nil {
+		return "error: " + err.Error()
+	}
+	b.WriteByte('}')
+	return b.String()
+}
+
+func stringKey(b *strings.Builder, key string) {
+	b.WriteString(key)
+	b.WriteByte(':')
+}
+
+func stringBytes(b *strings.Builder, key string, value []byte) {
+	if value != nil {
+		stringKey(b, key)
+		b.Write(value)
+	}
+}
+
+func stringStr(b *strings.Builder, key string, value string) {
+	stringKey(b, key)
+	b.WriteString(value)
+}
+
+func stringInt64(b *strings.Builder, key string, value int64) {
+	stringKey(b, key)
+	fmt.Fprintf(b, "%d", value)
+}
+func stringUint64(b *strings.Builder, key string, value uint64) {
+	stringKey(b, key)
+	fmt.Fprintf(b, "%d", value)
+}
+
+func stringEnvelope(b *strings.Builder, h *Header) {
+	n := h.EnvelopeLength()
+	if n > 0 {
+		stringKey(b, ",Envelope")
+		b.WriteByte('[')
+		fmt.Fprintf(b, "%.8g", h.Envelope(0))
+		for i := 1; i < n; i++ {
+			fmt.Fprintf(b, ",%.8g", h.Envelope(i))
+		}
+		b.WriteByte(']')
+	}
+}
+
+func stringFlags(b *strings.Builder, z, m, t, tm bool) {
+	if z || m || t || tm {
+		b.WriteByte(',')
+		var numPrinted int
+		flag := func(name string, value bool) {
+			if value {
+				if numPrinted > 0 {
+					b.WriteByte('|')
+				}
+				b.WriteString(name)
+				numPrinted++
+			}
+		}
+		flag("Z", z)
+		flag("M", m)
+		flag("T", t)
+		flag("TM", tm)
+	}
+}
+
+// String returns a string summarizing the Feature. The returned value
+// is a summary and not meant to be exhaustive.
+//
+// If the column schema is external to the Feature (i.e. it comes from
+// the file Header) and property column names are desired in the output,
+// use StringSchema.
 func (f *Feature) String() string {
 	return f.string(f)
 }
 
+// StringSchema returns a string summarizing the Feature. The returned
+// value is a summary and not meant to be exhaustive.
+//
+// This method ensures column names are included in the summary's
+// property output in cases where the Feature does not have its own
+// column schema, but another one is available (i.e. in the file
+// Header). Property column names are taken from the Feature's column
+// schema, if it has one, and the supplied Schema parameter otherwise.
 func (f *Feature) StringSchema(s Schema) string {
 	return f.string(f, s)
 }

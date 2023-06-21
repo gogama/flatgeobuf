@@ -24,7 +24,7 @@ func ExampleReader_Empty_File() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Header -> { FeaturesCount = %d, IndexNodeSize = %d, Title = %q }\n", hdr.FeaturesCount(), hdr.IndexNodeSize(), hdr.Title())
+	fmt.Println(hdr)
 
 	index, err := r.Index()
 	fmt.Printf("Index = %v, err = %v\n", index, err)
@@ -32,7 +32,7 @@ func ExampleReader_Empty_File() {
 	features, err := r.DataRem()
 	fmt.Printf("Data = %v, err = %v\n", features, err)
 
-	// Output: Header -> { FeaturesCount = 0, IndexNodeSize = 0, Title = "" }
+	// Output: Header{Name:gps_mobile_tiles,Type:Polygon,NumColumns:6,NumFeatures:0NO INDEX,CRS:{Org:EPSG,Code:4326,Name:WGS 84,WKT:821 bytes}}
 	// Index = <nil>, err = <nil>
 	// Data = [], err = <nil>
 }
@@ -49,7 +49,7 @@ func ExampleReader_Materialized_Index() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Header -> { FeaturesCount = %d, IndexNodeSize = %d, Title = %q }\n", hdr.FeaturesCount(), hdr.IndexNodeSize(), hdr.Title())
+	fmt.Println(hdr)
 
 	// Read the index into memory. This is a good option if repeated index
 	// searches are planned.
@@ -73,7 +73,7 @@ func ExampleReader_Materialized_Index() {
 			fmt.Printf("First Result: %s\n", data[results[0].RefIndex].StringSchema(hdr))
 		}
 	}
-	// Output: Header -> { FeaturesCount = 179, IndexNodeSize = 16, Title = "" }
+	// Output: Header{Name:countries,Envelope:[-180,-85.609038,180,83.64513],Type:MultiPolygon,NumColumns:2,NumFeatures:179,NodeSize:16,CRS:{Org:EPSG,Code:4326,Name:WGS 84,WKT:354 bytes}}
 	// Index -> { Bounds = [-180, -85.609038, 180, 83.64513], NumRefs = 179, NodeSize = 16 }
 	// Results -> [{Offset:160424 RefIndex:165}]
 	// First Result: Feature{Geometry:{Type:MultiPolygon,Bounds:[-171.79111, 18.91619, -66.96466, 71.357764]},Properties:{id:USA,name:United States of America}}
@@ -91,7 +91,7 @@ func ExampleReader_Streaming_Search() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Header -> { FeaturesCount = %d, IndexNodeSize = %d, Title = %q }\n", hdr.FeaturesCount(), hdr.IndexNodeSize(), hdr.Title())
+	fmt.Println(hdr)
 
 	var features []flatgeobuf.Feature
 
@@ -118,7 +118,7 @@ func ExampleReader_Streaming_Search() {
 	}
 	fmt.Printf("Second search, first Result: %s\n", features[0].StringSchema(hdr))
 
-	// Output: Header -> { FeaturesCount = 3221, IndexNodeSize = 16, Title = "" }
+	// Header{Name:US__counties,Envelope:[-179.14734,17.884813,179.77847,71.352561],Type:Unknown,NumColumns:6,NumFeatures:3221,NodeSize:16,CRS:{Org:EPSG,Code:4269,Name:NAD83,WKT:1280 bytes}}
 	// First search, first Result: Feature{Geometry:{Type:MultiPolygon,Bounds:[-88.263572, 41.469555, -87.524044, 42.154265]},Properties:{STATE_FIPS:17,COUNTY_FIP:031,FIPS:17031,STATE:IL,NAME:Cook,LSAD:County}}
 	// Second search, first Result: Feature{Geometry:{Type:MultiPolygon,Bounds:[-113.33438, 32.504938, -111.03991, 34.04817]},Properties:{STATE_FIPS:04,COUNTY_FIP:013,FIPS:04013,STATE:AZ,NAME:Maricopa,LSAD:County}}
 }
