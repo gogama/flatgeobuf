@@ -23,12 +23,17 @@ func (h *Header) String() string {
 		stringStr(&b, ",Type", h.GeometryType().String())
 		stringFlags(&b, h.HasZ(), h.HasM(), h.HasT(), h.HasTm())
 		stringInt64(&b, ",NumColumns", int64(h.ColumnsLength()))
-		stringUint64(&b, ",NumFeatures", h.FeaturesCount())
+		numFeatures := h.FeaturesCount()
+		if numFeatures > 0 {
+			stringUint64(&b, ",NumFeatures", h.FeaturesCount())
+		} else {
+			stringStr(&b, ",NumFeatures", "UNKNOWN")
+		}
 		nodeSize := h.IndexNodeSize()
 		if nodeSize > 0 {
 			stringUint64(&b, ",NodeSize", uint64(nodeSize))
 		} else {
-			fmt.Fprint(&b, "NO INDEX")
+			fmt.Fprint(&b, ",NO INDEX")
 		}
 		var crs Crs
 		stringKey(&b, ",CRS")
@@ -123,8 +128,9 @@ func stringFlags(b *strings.Builder, z, m, t, tm bool) {
 // is a summary and not meant to be exhaustive.
 //
 // If the column schema is external to the Feature (i.e. it comes from
-// the file Header) and property column names are desired in the output,
-// use StringSchema.
+// the file Header), the method StringSchema should be used. This method
+// will return a harmless, but useless, string containing an error
+// message.
 func (f *Feature) String() string {
 	return f.string(f)
 }
@@ -132,11 +138,8 @@ func (f *Feature) String() string {
 // StringSchema returns a string summarizing the Feature. The returned
 // value is a summary and not meant to be exhaustive.
 //
-// This method ensures column names are included in the summary's
-// property output in cases where the Feature does not have its own
-// column schema, but another one is available (i.e. in the file
-// Header). Property column names are taken from the Feature's column
-// schema, if it has one, and the supplied Schema parameter otherwise.
+// Property column names are taken from the Feature's column schema, if
+// it has one, and the supplied Schema parameter otherwise.
 func (f *Feature) StringSchema(s Schema) string {
 	return f.string(f, s)
 }

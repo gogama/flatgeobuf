@@ -385,17 +385,38 @@ func (r *FileReader) Data(p []Feature) (int, error) {
 
 // TODO: Write docs.
 func (r *FileReader) DataRem() ([]Feature, error) {
-	rem := r.numFeatures - r.featureIndex
-	p := make([]Feature, rem)
-	n, err := r.Data(p)
-	p = p[0:n]
-	if err != nil && err != io.EOF {
-		return p, err
+	if r.numFeatures > 0 {
+		rem := r.numFeatures - r.featureIndex
+		p := make([]Feature, rem)
+		n, err := r.Data(p)
+		p = p[0:n]
+		if err != nil && err != io.EOF {
+			return p, err
+		}
+		if n != rem {
+			fmtPanic("expected %d features but read %d", rem, n)
+		}
+		return p, nil
+	} else {
+		p := make([]Feature, 1024)
+		n, err := r.Data(p)
+		if err != nil && err != io.EOF {
+			return p[0:n], err
+		} else if err == io.EOF {
+			return p[0:n], nil
+		}
+		q := make([]Feature, 0, 2*len(p))
+		q = append(q, p[0:n]...)
+		for {
+			n, err = r.Data(p)
+			q = append(q, p[0:n]...)
+			if err != nil && err != io.EOF {
+				return q, err
+			} else if err == io.EOF {
+				return q, nil
+			}
+		}
 	}
-	if n != rem {
-		fmtPanic("expected %d features but read %d", rem, n)
-	}
-	return p, nil
 }
 
 // TODO: Write docs.

@@ -27,7 +27,7 @@ var EmptyBox = Box{
 
 // String serializes a Box as a GeoJSON-compliant bounding box string.
 func (b Box) String() string {
-	return fmt.Sprintf("[%.8g, %.8g, %.8g, %.8g]", b.XMin, b.YMin, b.XMax, b.YMax)
+	return fmt.Sprintf("[%.8g,%.8g,%.8g,%.8g]", b.XMin, b.YMin, b.XMax, b.YMax)
 }
 
 // Width returns the width of the Box.
