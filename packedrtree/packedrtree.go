@@ -6,6 +6,7 @@ package packedrtree
 
 import (
 	"container/heap"
+	"fmt"
 	"io"
 	"math"
 	"unsafe"
@@ -413,6 +414,11 @@ func (prt *PackedRTree) NumRefs() int {
 // NodeSize returns the child node count of the packed Hilbert R-Tree.
 func (prt *PackedRTree) NodeSize() uint16 {
 	return uint16(prt.nodeSize)
+}
+
+// String returns a summary description of the packed Hilbert R-Tree.
+func (prt *PackedRTree) String() string {
+	return fmt.Sprintf("PackedRTree{Bounds:%s,NumRefs:%d,NodeSize:%d}", prt.Bounds(), prt.numRefs, prt.nodeSize)
 }
 
 // Search searches the packed Hilbert R-Tree for qualified matches
