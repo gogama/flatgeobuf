@@ -494,14 +494,17 @@ func Unmarshal(r io.Reader, numRefs int, nodeSize uint16) (*PackedRTree, error) 
 
 // Seek searches the serialized representation of a packed Hilbert
 // R-Tree index directly from a seekable stream without needing to
-// Unmarshal the index into an in-memory data structure. Seek returns
-// all qualified matches whose bounding boxes intersect the query box.
+// Unmarshal the index into an in-memory data structure.
+//
+// Seek returns all qualified matches whose bounding boxes intersect the
+// query box. Results are guaranteed to be in ascending order of
+// Result.Offset.
 //
 // The seekable reader should be positioned ready to read the first byte
 // of the FlatGeobuf index section. If this function returns without
 // error, the seekable reader will be positioned ready to read the first
 // byte of the data section.
-func Seek(rs io.ReadSeeker, numRefs int, nodeSize uint16, b Box) ([]Result, error) {
+func Seek(rs io.ReadSeeker, numRefs int, nodeSize uint16, b Box) (Results, error) {
 	// Validate rs. numRefs and nodeSize are validated by noo, below.
 	if rs == nil {
 		textPanic("nil read seeker")
