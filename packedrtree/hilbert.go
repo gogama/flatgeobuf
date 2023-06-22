@@ -77,8 +77,8 @@ func hilbertOfCenter(b *Box, ex, ey, ew, eh float64) uint32 {
 	}
 	var hy uint32 // Hilbert Y-coordinate between 0 and hilbertMax
 	if eh != 0.0 {
-		ry := (b.midY() - ey) / ey
-		hx = uint32(math.Floor(hilbertMax * ry))
+		ry := (b.midY() - ey) / eh
+		hy = uint32(math.Floor(hilbertMax * ry))
 	}
 	return hilbertOfXY(hx, hy)
 }
