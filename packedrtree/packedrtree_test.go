@@ -395,8 +395,8 @@ func TestResults(t *testing.T) {
 					expected[i] = Result{int64(i), 0}
 					actual[i] = Result{int64(i), 0}
 				}
-				rand.Seed(int64(n))
-				rand.Shuffle(n, func(i, j int) {
+				r := rand.New(rand.NewSource(int64(n)))
+				r.Shuffle(n, func(i, j int) {
 					actual[i], actual[j] = actual[j], actual[i]
 				})
 
