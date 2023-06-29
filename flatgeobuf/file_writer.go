@@ -5,9 +5,10 @@
 package flatgeobuf
 
 import (
-	"github.com/gogama/flatgeobuf/packedrtree"
 	"io"
 	"math"
+
+	"github.com/gogama/flatgeobuf/packedrtree"
 )
 
 // FileWriter writes a FlatGeobuf file to an underlying stream.

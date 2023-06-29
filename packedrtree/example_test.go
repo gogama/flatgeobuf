@@ -11,12 +11,7 @@ import (
 	"github.com/gogama/flatgeobuf/packedrtree"
 )
 
-// Create a slice of Refs for example purposes. Normally the Box
-// field would contain the bounding box of a feature; and the Offset
-// field would contain the offset of the feature data from the start
-// of FlatGeobuf file data section (or some other arbitrary data
-// structure if you're using package packedrtree independent of the
-// FlatGeobuf file format).
+// Create a Ref slice for example purposes.
 var refs = []packedrtree.Ref{
 	{Box: packedrtree.Box{XMin: -2, YMin: -2, XMax: -1, YMax: -1}, Offset: 0},
 	{Box: packedrtree.Box{XMin: 1, YMin: 1, XMax: 2, YMax: 2}, Offset: 1},

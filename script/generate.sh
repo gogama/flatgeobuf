@@ -19,16 +19,23 @@ EOF
   exit 2
 fi
 
-if ! [ -d flatgeobuf ]; then
-  git clone git@github.com:flatgeobuf/flatgeobuf.git
+if ! [ -d tmp ]; then
+  mkdir tmp
+fi
+
+if ! [ -d tmp/flatgeobuf ]; then
+  git clone git@github.com:flatgeobuf/flatgeobuf.git tmp/flatgeobuf
+else
+  pushd tmp/flatgeobuf
+  git pull
+  popd
 fi
 
 # There doesn't seem to be a way to stop flatc from writing the
 # output files into a directory with the same name as the go namespace.
-# Hence using `-o ..` is a clever trick, based on the fact that this
-# repo's directory should be named flatgeobuf, to get the files
-# generated right in the root.
-flatc --go -o .. --go-namespace flatgeobuf flatgeobuf/src/fbs/*.fbs
+# Hence using `-o ../flatgeobuf/` with namespace `flat` results in flatc
+# generating the files under `../flatgeobuf/flat/`.
+flatc --go -o ../flatgeobuf/ --go-namespace flat tmp/flatgeobuf/src/fbs/*.fbs
 
-(cd flatgeobuf && git describe --tags) >version-schema.txt
+(cd tmp/flatgeobuf && git describe --tags) >version-schema.txt
 flatc --version >version-flatc.txt

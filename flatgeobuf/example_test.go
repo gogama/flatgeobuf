@@ -9,7 +9,7 @@ import (
 	"os"
 	"sort"
 
-	"github.com/gogama/flatgeobuf"
+	"github.com/gogama/flatgeobuf/flatgeobuf"
 	"github.com/gogama/flatgeobuf/packedrtree"
 )
 

@@ -25,7 +25,8 @@ var EmptyBox = Box{
 	YMax: math.Inf(-1),
 }
 
-// String serializes a Box as a GeoJSON-compliant bounding box string.
+// String serializes a Box as a GeoJSON-compliant bounding box string
+// with 8 decimal digits of precision.
 func (b Box) String() string {
 	return fmt.Sprintf("[%.8g,%.8g,%.8g,%.8g]", b.XMin, b.YMin, b.XMax, b.YMax)
 }
@@ -48,9 +49,10 @@ func (b *Box) midY() float64 {
 	return (b.YMin + b.YMax) / 2
 }
 
-// Expand makes the minimum possible expansion to the receiver Box, if
-// necessary, so that it completely contains the second Box in addition
-// to everything it previously contained.
+// Expand ensures one Box completely contains another Box.
+//
+// Expand makes the minimum necessary expansion to the receiver Box, and
+// only if a change is necessary to contain the parameter.
 func (b *Box) Expand(c *Box) {
 	if c.XMin < b.XMin {
 		b.XMin = c.XMin
@@ -66,9 +68,10 @@ func (b *Box) Expand(c *Box) {
 	}
 }
 
-// ExpandXY makes the minimum possible expansion to the receiver Box, if
-// necessary, so that it completely contains the given coordinate pair
-// in addition to everything it previously contained.
+// ExpandXY ensures a Box contains a coordinate pair.
+//
+// ExpandXY makes the minimum possible expansion to the receiver Box,
+// and only if a change is necessary to contain the (x, y) coordinate.
 func (b *Box) ExpandXY(x, y float64) {
 	if x < b.XMin {
 		b.XMin = x

@@ -13,14 +13,15 @@ import (
 )
 
 // A Ref is a single item within the PackedRTree and represents a
-// reference to a feature stored in the data section. Each Ref consists
-// of its feature's Offset into the data section plus a Box representing
-// the bounding box of the feature's geometry.
+// reference to a feature stored elsewhere. That "elsewhere" will often
+// be the data section of a FlatGeobuf file.
 type Ref struct {
+	// The Box is the bounding box of the referenced feature.
 	Box
 
 	// Offset is the referenced feature's byte offset into the data
-	// section.
+	// section, when working with FlatGeobuf; otherwise it can contain
+	// any arbitrary data useful for identifying the referenced feature.
 	Offset int64
 }
 
@@ -275,21 +276,27 @@ func noo(numRefs int, nodeSize uint16, push pushFunc, pop popFunc, fetch fetchFu
 	}
 }
 
-// Result is a single index search result. A Result's fields can be used
-// to locate the corresponding feature in the main data section of the
-// FlatGeobuf file, or in the Ref list passed to New when creating the
-// PackedRTree.
+// Result is a qualified index search result. It represents a matched
+// Ref, i.e. a Ref whose bounding box intersected the query box.
 type Result struct {
-	// Offset is the result feature's byte offset into the data section.
+	// Offset contains the Offset field from the matched Ref.
+	//
+	// If working with FlatGeobuf, this is the byte offset of the result
+	// feature in the FlatGeobuf data section.
 	Offset int64
-	// RefIndex of the feature reference in the Hilbert-sorted list of
-	// Ref values passed to New when creating the PackedRTree.
+	// RefIndex is the index of the matched Ref.
+	//
+	// If working with a PackedRTree created by new, this is the index
+	// of the Ref in the input slice passed to New. If working with a
+	// PackedRTree deserialized with Unmarshal, this is the index of
+	// the Ref relative to the start of the leaf nodes in the serialized
+	// representation.
 	RefIndex int
 }
 
-// Results is a slice of Result structures which implements
-// sort.Interface. The sort.Sort function will sort a Results instance
-// in ascending order of Result.Offset.
+// Results is a slice of Result structures implementing sort.Interface.
+// The sort.Sort function will sort a Results instance in ascending
+// order of Result.Offset.
 type Results []Result
 
 // Len returns the length of the slice. It implements the corresponding
@@ -419,7 +426,7 @@ func (prt *PackedRTree) NumRefs() int {
 	return prt.numRefs
 }
 
-// NodeSize returns the child node count of the packed Hilbert R-Tree.
+// NodeSize returns the number of R-Tree child nodes per parent node.
 func (prt *PackedRTree) NodeSize() uint16 {
 	return uint16(prt.nodeSize)
 }
@@ -444,7 +451,7 @@ func (prt *PackedRTree) Search(b Box) Results {
 }
 
 // Marshal serializes the packed Hilbert R-Tree as a FlatGeobuf index
-// section to a writer, returning the number of bytes written.
+// section. It returns the number of bytes written.
 //
 // If you are writing a complete FlatGeobuf file, the writer should be
 // positioned ready to write the first byte of the index. If this method
@@ -503,7 +510,7 @@ func Unmarshal(r io.Reader, numRefs int, nodeSize uint16) (*PackedRTree, error) 
 }
 
 // Seek searches the serialized representation of a packed Hilbert
-// R-Tree index directly from a seekable stream without needing to
+// R-Tree index directly, from a seekable stream, without needing to
 // Unmarshal the index into an in-memory data structure.
 //
 // Seek returns all qualified matches whose bounding boxes intersect the

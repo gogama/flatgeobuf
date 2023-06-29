@@ -23,10 +23,3 @@ TODO:
        validate that it works. I think the code and docs are ambiguous
        or assumey about whether offset is relative to data section start
        or relative to file start.
-    3. I would restructure things to move most of the root files to a
-       subdirectory, so:
-        flatgeobuf/  ---> Main code, well-documented
-           flat/ ---> Generated code, only package.go has docs
-        packedrtree/ ---> Packed R-Tree
-        testdata/ ---> Test data
-        tmp/flatgeobuf/ ---> Temporary directory where upstream gets checked out by scripts.

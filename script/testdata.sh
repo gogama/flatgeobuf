@@ -18,12 +18,20 @@ EOF
   exit 2
 fi
 
-if ! [ -d flatgeobuf ]; then
-  git clone git@github.com:flatgeobuf/flatgeobuf.git
+if ! [ -d tmp ]; then
+  mkdir tmp
+fi
+
+if ! [ -d tmp/flatgeobuf ]; then
+  git clone git@github.com:flatgeobuf/flatgeobuf.git tmp/flatgeobuf
+else
+  pushd tmp/flatgeobuf
+  git pull
+  popd
 fi
 
 rsync -av --delete \
   --include "*/" \
   --include "*.fgb" \
   --exclude "*" \
-  flatgeobuf/test/data/ testdata/flatgeobuf/
+  tmp/flatgeobuf/test/data/ ../testdata/flatgeobuf/
