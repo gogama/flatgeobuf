@@ -45,7 +45,7 @@ func (b *Box) midX() float64 {
 }
 
 func (b *Box) midY() float64 {
-	return (b.YMin + b.YMin) / 2
+	return (b.YMin + b.YMax) / 2
 }
 
 // Expand makes the minimum possible expansion to the receiver Box, if
@@ -72,27 +72,30 @@ func (b *Box) Expand(c *Box) {
 func (b *Box) ExpandXY(x, y float64) {
 	if x < b.XMin {
 		b.XMin = x
-	} else if x > b.XMax {
+	}
+	if x > b.XMax {
 		b.XMax = x
 	}
 	if y < b.YMin {
 		b.YMin = y
-	} else if y > b.YMax {
+	}
+	if y > b.YMax {
 		b.YMax = y
 	}
 }
 
-func (b *Box) intersects(o *Box) bool {
-	if b.XMax < o.XMin {
+// intersects returns true iff the given box intersects the receiver.
+func (b *Box) intersects(c *Box) bool {
+	if b.XMax < c.XMin {
 		return false
 	}
-	if b.YMax < o.YMin {
+	if b.YMax < c.YMin {
 		return false
 	}
-	if b.XMin > o.XMax {
+	if b.XMin > c.XMax {
 		return false
 	}
-	if b.YMin > o.YMax {
+	if b.YMin > c.YMax {
 		return false
 	}
 	return true

@@ -36,6 +36,9 @@ func (hs *hilbertSortable) Len() int {
 func (hs *hilbertSortable) Less(i, j int) bool {
 	a := hilbertOfCenter(&hs.refs[i].Box, hs.x, hs.y, hs.w, hs.h)
 	b := hilbertOfCenter(&hs.refs[j].Box, hs.x, hs.y, hs.w, hs.h)
+	// All reference implementations of FlatGeobuf use '>' to sort in
+	// descending order of Hilbert number.
+	//     https://github.com/flatgeobuf/flatgeobuf/discussions/271
 	return a > b
 }
 
@@ -44,13 +47,20 @@ func (hs *hilbertSortable) Swap(i, j int) {
 }
 
 // HilbertSort sorts a list of feature references, whose overall
-// bounding box is given by bounds, according to the order given by a
-// Hilbert curve of order HilbertOrder.
+// bounding box is given by bounds, in descending order of position on
+// a Hilbert curve of order HilbertOrder.
 //
 // The sort algorithm is not guaranteed to be stable, so the relative
 // position of two feature references with the same index on the Hilbert
 // curve may change as a result of the sort.
-func HilbertSort(refs []Ref, bounds *Box) {
+//
+// The descending sort order may be somewhat unexpected, as ascending
+// order is perhaps more idiomatic. Descending order is done to maximize
+// consistency with other FlatGeobuf implementations, but nothing turns
+// on the sort order. Both ascending and descending sorts can be used to
+// create a valid PackedRTree, and any FlatGeobuf implementation will
+// work equally well with an index sorted either way.
+func HilbertSort(refs []Ref, bounds Box) {
 	hs := hilbertSortable{
 		refs: refs,
 		x:    bounds.XMin,

@@ -35,5 +35,17 @@ TODO in README:
    3. Generally ensure attribution of all the things.
 
 TODO:
-    1. If I'm committing to Go 1.20 due to unsafe.String, then replace
-       all interface{} with any.
+    1. If I'm committing to Go 1.20 due to unsafe.String, then:
+        - replace all interface{} with any.
+        - Consider using a generics-based heap which is faster? Or maybe do that another day.
+    2. Clear up all CODE and DOCUMENTATION references to Ref.Offset and
+       validate that it works. I think the code and docs are ambiguous
+       or assumey about whether offset is relative to data section start
+       or relative to file start.
+    3. I would restructure things to move most of the root files to a
+       subdirectory, so:
+        flatgeobuf/  ---> Main code, well-documented
+           flat/ ---> Generated code, only package.go has docs
+        packedrtree/ ---> Packed R-Tree
+        testdata/ ---> Test data
+        tmp/flatgeobuf/ ---> Temporary directory where upstream gets checked out by scripts.

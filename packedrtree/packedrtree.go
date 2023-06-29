@@ -24,6 +24,10 @@ type Ref struct {
 	Offset int64
 }
 
+func (r Ref) String() string {
+	return fmt.Sprintf("Ref{[%.8g,%.8g,%.8g,%.8g],Offset:%d}", r.XMin, r.YMin, r.XMax, r.YMax, r.Offset)
+}
+
 // A node is a private version of Ref used to (hopefully) reduce
 // confusion. A leaf node is exactly the same as a Ref and has the
 // same meaning. A non-leaf node is subtly different: the Box is the
@@ -47,17 +51,17 @@ func validateParams(numRefs int, nodeSize uint16) {
 // having a given feature reference count and node size. Panics if
 // numRefs is less than 1 or nodeSize is less than 2, and returns an
 // error if integer overflow occurs.
-func Size(numRefs int, nodeSize uint16) (int64, error) {
+func Size(numRefs int, nodeSize uint16) (int, error) {
 	validateParams(numRefs, nodeSize)
-	return size(numRefs, int(nodeSize))
+	return size(uint(numRefs), uint(nodeSize))
 }
 
 // size returns the disk size in bytes of a packed Hilbert R-Tree index
 // having a given feature reference count and node size. Returns an
 // error if integer overflow occurs.
-func size(numRefs, nodeSize int) (int64, error) {
+func size(numRefs, nodeSize uint) (int, error) {
 	// Count total number of internal nodes in the tree.
-	var numInternal int
+	var numInternal uint
 	nodesThisLevel := numRefs
 	for {
 		nodesThisLevel = (nodesThisLevel + nodeSize - 1) / nodeSize
@@ -69,18 +73,18 @@ func size(numRefs, nodeSize int) (int64, error) {
 
 	// Calculate total number of nodes, ensuring it does not overflow
 	// int.
-	numNodes, err := totalNodes(numRefs, numInternal)
+	numNodes, err := totalNodes(int(numRefs), int(numInternal))
 	if err != nil {
 		return 0, err
 	}
 
 	// Ensure total tree size does not overflow int64.
-	if int64(numNodes) > math.MaxInt64/int64(numNodeBytes) {
-		return 0, textErr("index size overflows int64")
+	if numNodes > math.MaxInt/int(numNodeBytes) {
+		return 0, textErr("index size overflows int")
 	}
 
 	// Calculate and return total tree size.
-	return int64(numNodes) * int64(numNodeBytes), nil
+	return numNodes * numNodeBytes, nil
 }
 
 // totalNodes sums numRefs and numInternal, returning an error if
@@ -114,10 +118,10 @@ type levelRange struct {
 // function will be [[3, 7], [1, 3], [0, 1]], where first item in the
 // list represents the leaf node level, and the last item in the list is
 // the root level.
-func levelify(numRefs, nodeSize int) ([]levelRange, error) {
+func levelify(numRefs, nodeSize uint) []levelRange {
 	// numInternal is the number of internal nodes in the tree, a number
 	// strictly less than numRefs.
-	var numInternal int
+	var numInternal uint
 
 	// Generate a list of node counts per level, in the same order as
 	// the final levelRange list, i.e. the leaf level 0 is first and the
@@ -127,10 +131,10 @@ func levelify(numRefs, nodeSize int) ([]levelRange, error) {
 	// this logic is nodesPerLevel = [4, 2, 1].
 	nodesThisLevel := numRefs
 	nodesPerLevel := make([]int, 1, 16)
-	nodesPerLevel[0] = nodesThisLevel
+	nodesPerLevel[0] = int(nodesThisLevel)
 	for {
 		nodesThisLevel = (nodesThisLevel + nodeSize - 1) / nodeSize
-		nodesPerLevel = append(nodesPerLevel, nodesThisLevel)
+		nodesPerLevel = append(nodesPerLevel, int(nodesThisLevel))
 		numInternal += nodesThisLevel
 		if nodesThisLevel == 1 {
 			break
@@ -138,9 +142,9 @@ func levelify(numRefs, nodeSize int) ([]levelRange, error) {
 	}
 
 	// Sum up the total number of nodes.
-	numNodes, err := totalNodes(numRefs, numInternal)
+	numNodes, err := totalNodes(int(numRefs), int(numInternal))
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
 	// Generate a list of node start indices per level, in the same
@@ -161,7 +165,7 @@ func levelify(numRefs, nodeSize int) ([]levelRange, error) {
 		levels[i].start = levelIndices[i]
 		levels[i].end = levelIndices[i] + nodesPerLevel[i]
 	}
-	return levels, nil
+	return levels
 }
 
 // A fetchFunc is used to fetch the nodes from the closed/open index
@@ -194,7 +198,7 @@ type ticketBag []ticket
 func (tq ticketBag) Len() int            { return len(tq) }
 func (tq ticketBag) Less(i, j int) bool  { return tq[i].nodeIndex < tq[j].nodeIndex }
 func (tq ticketBag) Swap(i, j int)       { tq[i], tq[j] = tq[j], tq[i] }
-func (tq *ticketBag) Push(x interface{}) { *tq = append(*tq, x.(ticket)) }
+func (tq *ticketBag) Push(x interface{}) { stackPush(tq, x.(ticket)) }
 func (tq *ticketBag) Pop() interface{} {
 	return stackPop(tq)
 }
@@ -253,16 +257,13 @@ type packedRTree struct {
 
 // noo constructs a new packedRTree.
 //
+// This function MUST NOT be called until Size has been called, since
+// noo depends on Size for parameter validation.
+//
 // In the official FlatGeobuf implementations, noo is most analogous to
 // the function or method named init().
-func noo(numRefs int, nodeSize uint16, push pushFunc, pop popFunc, fetch fetchFunc) (packedRTree, error) {
-	validateParams(numRefs, nodeSize)
-
-	levels, err := levelify(numRefs, int(nodeSize))
-	if err != nil {
-		return packedRTree{}, err
-	}
-
+func noo(numRefs int, nodeSize uint16, push pushFunc, pop popFunc, fetch fetchFunc) packedRTree {
+	levels := levelify(uint(numRefs), uint(nodeSize))
 	return packedRTree{
 		numRefs:  numRefs,
 		nodeSize: int(nodeSize),
@@ -271,7 +272,7 @@ func noo(numRefs int, nodeSize uint16, push pushFunc, pop popFunc, fetch fetchFu
 		push:     push,
 		pop:      pop,
 		fetch:    fetch,
-	}, nil
+	}
 }
 
 // Result is a single index search result. A Result's fields can be used
@@ -287,8 +288,8 @@ type Result struct {
 }
 
 // Results is a slice of Result structures which implements
-// sort.Interface. The sort.Sort function will sort Results in
-// ascending order of Result.Offset.
+// sort.Interface. The sort.Sort function will sort a Results instance
+// in ascending order of Result.Offset.
 type Results []Result
 
 // Len returns the length of the slice. It implements the corresponding
@@ -314,7 +315,7 @@ func (rs Results) Swap(i, j int) {
 // capable of streaming search depending on the callback functions
 // configured in prt.
 func (prt *packedRTree) search(b Box) (Results, error) {
-	q := make(ticketBag, 1)
+	q := make(ticketBag, 1, 32)
 	q[0] = ticket{nodeIndex: 0, level: len(prt.levels) - 1}
 	r := make(Results, 0)
 
@@ -366,31 +367,38 @@ type PackedRTree struct {
 // Use HilbertSort to sort the feature references. If the input slice is
 // not Hilbert-sorted, the behavior of the new PackedRTree is undefined.
 func New(refs []Ref, nodeSize uint16) (*PackedRTree, error) {
-	// Create the private, non-exported data structure.
-	prt, err := noo(len(refs), nodeSize, stackPush, stackPop, nil)
-	if err != nil {
+	// Validate parameters.
+	if _, err := Size(len(refs), nodeSize); err != nil {
 		return nil, err
 	}
+	// Create the private, non-exported data structure.
+	prt := noo(len(refs), nodeSize, stackPush, stackPop, nil)
 	// Save copies of the leaf nodes.
 	i := prt.levels[0].start
 	for j := range refs {
 		prt.nodes[i] = node{refs[j]}
 		i++
 	}
-	// Generate the internal nodes.
+	// Generate the internal nodes, starting at the leaves and working
+	// up to the root.
 	for i = 0; i < len(prt.levels)-1; i++ {
 		level := prt.levels[i]
 		nodeIndex := level.start
-		parent := &prt.nodes[prt.levels[i+1].start]
+		parentIndex := prt.levels[i+1].start
+	level:
 		for nodeIndex < level.end {
-			*parent = node{Ref: Ref{EmptyBox, int64(nodeIndex)}}
+			prt.nodes[parentIndex] = node{Ref: Ref{EmptyBox, int64(nodeIndex)}}
 			var j int
+		parent:
 			for {
-				parent.Expand(&prt.nodes[nodeIndex].Box)
+				prt.nodes[parentIndex].Expand(&prt.nodes[nodeIndex].Box)
 				j++
 				nodeIndex++
-				if j == prt.nodeSize || nodeIndex == level.end {
-					break
+				if j == prt.nodeSize {
+					parentIndex++
+					break parent
+				} else if nodeIndex == level.end {
+					break level
 				}
 			}
 		}
@@ -463,25 +471,27 @@ func (prt *PackedRTree) Marshal(w io.Writer) (n int, err error) {
 // The Seek function can be used to search an on-disk or in-storage
 // representation of the index without needing to unmarshal it.
 func Unmarshal(r io.Reader, numRefs int, nodeSize uint16) (*PackedRTree, error) {
-	// Validate r. numRefs and nodeSize are validated by noo, below.
+	// Validate r. numRefs and nodeSize are validated by Size, below.
 	if r == nil {
 		textPanic("nil reader")
 	}
 
-	// Construct the private data structure into which we will read the
-	// tree nodes.
-	prt, err := noo(numRefs, nodeSize, stackPush, stackPop, nil)
-	if err != nil {
+	// Check for size errors before continuing.
+	if _, err := Size(numRefs, nodeSize); err != nil {
 		return nil, err
 	}
+
+	// Construct the private data structure into which we will read the
+	// tree nodes.
+	prt := noo(numRefs, nodeSize, stackPush, stackPop, nil)
 
 	// Read the raw nodes directly into the private data structure's
 	// nodes slice. If this is a big-endian system, the byte order of
 	// all the numbers will be backward.
 	ptr := (*byte)(unsafe.Pointer(&prt.nodes[0]))
 	dst := unsafe.Slice(ptr, numNodeBytes*len(prt.nodes))
-	if _, err = io.ReadFull(r, dst); err != nil {
-		return nil, err
+	if _, err := io.ReadFull(r, dst); err != nil {
+		return nil, wrapErr("failed to read index bytes", err)
 	}
 
 	// Convert the little-endian octets read from the source data into
@@ -505,7 +515,7 @@ func Unmarshal(r io.Reader, numRefs int, nodeSize uint16) (*PackedRTree, error) 
 // error, the seekable reader will be positioned ready to read the first
 // byte of the data section.
 func Seek(rs io.ReadSeeker, numRefs int, nodeSize uint16, b Box) (Results, error) {
-	// Validate rs. numRefs and nodeSize are validated by noo, below.
+	// Validate rs. numRefs and nodeSize are validated by Size, below.
 	if rs == nil {
 		textPanic("nil read seeker")
 	}
@@ -518,13 +528,13 @@ func Seek(rs io.ReadSeeker, numRefs int, nodeSize uint16, b Box) (Results, error
 
 	// Calculate the end offset of the index and check for integer
 	// overflow.
-	sz, err := size(numRefs, int(nodeSize))
+	sz, err := Size(numRefs, nodeSize)
 	if err != nil {
 		return nil, err
-	} else if sz > math.MaxInt64-startOffset {
+	} else if int64(sz) > math.MaxInt64-startOffset {
 		return nil, textErr("index end offset overflows int64")
 	}
-	endOffset := startOffset + sz
+	endOffset := startOffset + int64(sz)
 
 	// Keep track of current offset.
 	offset := startOffset
@@ -536,14 +546,14 @@ func Seek(rs io.ReadSeeker, numRefs int, nodeSize uint16, b Box) (Results, error
 		if rel != 0 {
 			offset, err = rs.Seek(rel, io.SeekCurrent)
 			if err != nil {
-				return fmtErr("failed to seek to node %d, rel. offset %d", err, i, rel)
+				return wrapErr("failed to seek to node %d, rel. offset %d", err, i, rel)
 			}
 		}
 
 		// Read the data.
 		err = readLittleEndianNodes(rs, i, j, nodes)
 		if err != nil {
-			return fmtErr("failed to read nodes %d..%d, rel. offset %d", err, i, j, rel)
+			return wrapErr("failed to read nodes [%d..%d), rel. offset %d", err, i, j, rel)
 		}
 
 		// Update current offset to the end of the range.
@@ -556,10 +566,7 @@ func Seek(rs io.ReadSeeker, numRefs int, nodeSize uint16, b Box) (Results, error
 	// Construct the private data structure using a min-heap for the
 	// work tracking ticket bag to ensure the index is read
 	// sequentially.
-	prt, err := noo(numRefs, nodeSize, heapPush, heapPop, fetch)
-	if err != nil {
-		return nil, err
-	}
+	prt := noo(numRefs, nodeSize, heapPush, heapPop, fetch)
 
 	// Search the index.
 	sr, err := prt.search(b)

@@ -195,7 +195,7 @@ func (w *FileWriter) IndexDataPtr(data []*Feature) (n int, err error) {
 		err = wrapErr("failed to index feature %d", err, i)
 		return
 	}
-	packedrtree.HilbertSort(refs, &bounds)
+	packedrtree.HilbertSort(refs, bounds)
 	var index *packedrtree.PackedRTree
 	if index, err = packedrtree.New(refs, w.nodeSize); err != nil {
 		return
