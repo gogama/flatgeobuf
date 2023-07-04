@@ -33,10 +33,7 @@ func ExampleMagic() {
 }
 
 // TODO: Explain this example somewhere.
-// TODO: NOTE: renamed from _emptyFile (renders as "EmptyFile") to
-// ...... _empty_file to see if it renders as "Empty<space>File" in
-// ...... in the docs.
-func ExampleFileReader_empty_file() {
+func ExampleFileReader_emptyFile() {
 	r := flatgeobuf.NewFileReader(openFile("../testdata/flatgeobuf/empty.fgb"))
 	defer r.Close()
 
@@ -57,10 +54,16 @@ func ExampleFileReader_empty_file() {
 }
 
 // TODO: Explain this example somewhere.
-// TODO: ... NOTE: I renamed suffix from _unknownFeatureCount to _unknown_feature_count
-// ......... to see if pkg.go.dev rendering will replace underscores with spaces.
-// ......... (_unknownFeatureCount) is rendering "UnknownFeatureCount" in the docs.
-func ExampleFileReader_unknown_feature_count() {
+// TODO: ... NOTE: My rename experiment failed - there's no way to make the Go
+// ......... doc framework generate example names with spaces or nice sentence
+// ......... case: the name `_unknown_feature_count` rendered as `Unknown_feature_count`
+// ......... which is uglier than `UnknownFeatureCount` so I put it back.
+// ......... see for example https://pkg.go.dev/net/http where there are example
+// ......... names like "DotFileHiding" and "StripPrefix" that show that that's
+// ......... just "now it is". I'm temporarily leaving this comment here to
+// ......... remind myself that the example names are fine as is. This comment
+// ......... should be removed during documentation write.
+func ExampleFileReader_unknownFeatureCount() {
 	r := flatgeobuf.NewFileReader(openFile("../testdata/flatgeobuf/unknown_feature_count.fgb"))
 	defer r.Close()
 
