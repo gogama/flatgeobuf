@@ -5,6 +5,7 @@
 package flatgeobuf
 
 import (
+	"github.com/gogama/flatgeobuf/flatgeobuf/flat"
 	"io"
 	"math"
 	"unsafe"
@@ -161,10 +162,10 @@ func (r *PropReader) ReadBinary() ([]byte, error) {
 }
 
 type PropValue struct {
-	Col      Column
+	Col      flat.Column
 	Value    interface{}
 	ColIndex uint16
-	Type     ColumnType
+	Type     flat.ColumnType
 }
 
 func (r *PropReader) ReadSchema(schema Schema) ([]PropValue, error) {
@@ -190,31 +191,31 @@ func (r *PropReader) ReadSchema(schema Schema) ([]PropValue, error) {
 		}
 		val.Type = val.Col.Type()
 		switch val.Type {
-		case ColumnTypeByte:
+		case flat.ColumnTypeByte:
 			val.Value, err = r.ReadByte()
-		case ColumnTypeUByte:
+		case flat.ColumnTypeUByte:
 			val.Value, err = r.ReadUByte()
-		case ColumnTypeBool:
+		case flat.ColumnTypeBool:
 			val.Value, err = r.ReadBool()
-		case ColumnTypeShort:
+		case flat.ColumnTypeShort:
 			val.Value, err = r.ReadShort()
-		case ColumnTypeUShort:
+		case flat.ColumnTypeUShort:
 			val.Value, err = r.ReadUShort()
-		case ColumnTypeInt:
+		case flat.ColumnTypeInt:
 			val.Value, err = r.ReadInt()
-		case ColumnTypeUInt:
+		case flat.ColumnTypeUInt:
 			val.Value, err = r.ReadUInt()
-		case ColumnTypeLong:
+		case flat.ColumnTypeLong:
 			val.Value, err = r.ReadLong()
-		case ColumnTypeULong:
+		case flat.ColumnTypeULong:
 			val.Value, err = r.ReadULong()
-		case ColumnTypeFloat:
+		case flat.ColumnTypeFloat:
 			val.Value, err = r.ReadFloat()
-		case ColumnTypeDouble:
+		case flat.ColumnTypeDouble:
 			val.Value, err = r.ReadDouble()
-		case ColumnTypeString, ColumnTypeDateTime:
+		case flat.ColumnTypeString, flat.ColumnTypeDateTime:
 			val.Value, err = r.ReadString()
-		case ColumnTypeJson, ColumnTypeBinary:
+		case flat.ColumnTypeJson, flat.ColumnTypeBinary:
 			val.Value, err = r.ReadBinary()
 		default:
 			fmtPanic("unknown column type: %s", val.Type)

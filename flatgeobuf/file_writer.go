@@ -8,6 +8,8 @@ import (
 	"io"
 	"math"
 
+	"github.com/gogama/flatgeobuf/flatgeobuf/flat"
+
 	"github.com/gogama/flatgeobuf/packedrtree"
 )
 
@@ -44,16 +46,16 @@ func NewFileWriter(w io.Writer) *FileWriter {
 //		be a size-prefixed ROOT table existing at offset 0 in the buffer,
 //	 which is of course true of what our FileReader returns, but is not
 //	 generally true.
-func (w *FileWriter) Header(h *Header) (n int, err error) {
+func (w *FileWriter) Header(hdr *flat.Header) (n int, err error) {
 	// Minimally validate incoming pointer.
-	if h == nil {
+	if hdr == nil {
 		textPanic("nil header")
 	}
 
 	// Cache feature count and check for overflow.
 	var numFeatures uint64
 	err = safeFlatBuffersInteraction(func() error {
-		numFeatures = h.FeaturesCount()
+		numFeatures = hdr.FeaturesCount()
 		return nil
 	})
 	if err != nil {
@@ -68,7 +70,7 @@ func (w *FileWriter) Header(h *Header) (n int, err error) {
 	// Cache index node size and check for illegal value.
 	var nodeSize uint16
 	err = safeFlatBuffersInteraction(func() error {
-		nodeSize = h.IndexNodeSize()
+		nodeSize = hdr.IndexNodeSize()
 		return nil
 	})
 	if err != nil {
@@ -102,7 +104,7 @@ func (w *FileWriter) Header(h *Header) (n int, err error) {
 	}
 
 	// Write the header table.
-	m, err = writeSizePrefixedTable(w.w, h.Table())
+	m, err = writeSizePrefixedTable(w.w, hdr.Table())
 	n += m
 	if err != nil {
 		err = w.toErr(wrapErr("failed to write header", err))
@@ -156,8 +158,8 @@ func (w *FileWriter) index(index *packedrtree.PackedRTree) (n int, err error) {
 }
 
 // TODO: Docs
-func (w *FileWriter) IndexData(data []Feature) (n int, err error) {
-	dataPtr := make([]*Feature, len(data))
+func (w *FileWriter) IndexData(data []flat.Feature) (n int, err error) {
+	dataPtr := make([]*flat.Feature, len(data))
 	for i := range data {
 		dataPtr[i] = &data[i]
 	}
@@ -165,7 +167,7 @@ func (w *FileWriter) IndexData(data []Feature) (n int, err error) {
 }
 
 // TODO: Docs
-func (w *FileWriter) IndexDataPtr(data []*Feature) (n int, err error) {
+func (w *FileWriter) IndexDataPtr(data []*flat.Feature) (n int, err error) {
 	// Verify state.
 	if err = w.canWriteIndex(); err != nil {
 		return
@@ -224,7 +226,7 @@ func (w *FileWriter) IndexDataPtr(data []*Feature) (n int, err error) {
 // TODO: Same issue as affecting Header and the IndexData* methods affects us
 //
 //	here: feature has to be a size-prefixed root table at offset 0
-func (w *FileWriter) Data(f *Feature) (n int, err error) {
+func (w *FileWriter) Data(f *flat.Feature) (n int, err error) {
 	// Minimally validate incoming pointer.
 	if f == nil {
 		textPanic("nil feature")
@@ -308,10 +310,10 @@ func (w *FileWriter) canWriteData() error {
 	return nil
 }
 
-func featureBounds(b *packedrtree.Box, f *Feature) error {
+func featureBounds(b *packedrtree.Box, f *flat.Feature) error {
 	*b = packedrtree.EmptyBox
 	return safeFlatBuffersInteraction(func() error {
-		var g Geometry
+		var g flat.Geometry
 		if f.Geometry(&g) != nil {
 			n := g.XyLength()
 			for i := 0; i < n; i += 2 {

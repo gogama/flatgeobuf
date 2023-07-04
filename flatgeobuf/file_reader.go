@@ -9,6 +9,8 @@ import (
 	"math"
 	"sort"
 
+	"github.com/gogama/flatgeobuf/flatgeobuf/flat"
+
 	"github.com/gogama/flatgeobuf/packedrtree"
 	flatbuffers "github.com/google/flatbuffers/go"
 )
@@ -58,7 +60,7 @@ func NewFileReader(r io.Reader) *FileReader {
 }
 
 // TODO: Write docs.
-func (r *FileReader) Header() (*Header, error) {
+func (r *FileReader) Header() (*flat.Header, error) {
 	// Transition into state for reading magic number.
 	if err := r.toState(uninitialized, beforeMagic); err == errUnexpectedState {
 		return nil, textErr(errHeaderAlreadyCalled)
@@ -102,11 +104,11 @@ func (r *FileReader) Header() (*Header, error) {
 
 	// Convert to FlatBuffer-based Header structure and get number of
 	// features and size of index tree nodes.
-	var hdr *Header
+	var hdr *flat.Header
 	var numFeatures uint64
 	var nodeSize uint16
 	if err = safeFlatBuffersInteraction(func() error {
-		hdr = GetSizePrefixedRootAsHeader(tbl, 0)
+		hdr = flat.GetSizePrefixedRootAsHeader(tbl, 0)
 		numFeatures = hdr.FeaturesCount()
 		nodeSize = hdr.IndexNodeSize()
 		return nil
@@ -213,7 +215,7 @@ func (r *FileReader) Index() (*packedrtree.PackedRTree, error) {
 }
 
 // TODO: Write docs.
-func (r *FileReader) IndexSearch(b packedrtree.Box) ([]Feature, error) {
+func (r *FileReader) IndexSearch(b packedrtree.Box) ([]flat.Feature, error) {
 	// Searches are only allowed if the reader is positioned immediately
 	// after the header, either as a result of a Rewind(), or because of
 	// a successful call to Header() immediately before.
@@ -300,7 +302,7 @@ func (r *FileReader) IndexSearch(b packedrtree.Box) ([]Feature, error) {
 
 	// Traverse the data section collecting all the features included
 	// in the search results.
-	fs := make([]Feature, len(sr))
+	fs := make([]flat.Feature, len(sr))
 	for i := range sr {
 		if sr[i].Offset > r.featureOffset {
 			if err := skip(sr[i].Offset - r.featureOffset); err != nil {
@@ -329,7 +331,7 @@ func (r *FileReader) IndexSearch(b packedrtree.Box) ([]Feature, error) {
 }
 
 // TODO: Write docs.
-func (r *FileReader) Data(p []Feature) (int, error) {
+func (r *FileReader) Data(p []flat.Feature) (int, error) {
 	if r.err != nil {
 		return 0, r.err
 	}
@@ -384,10 +386,10 @@ func (r *FileReader) Data(p []Feature) (int, error) {
 }
 
 // TODO: Write docs.
-func (r *FileReader) DataRem() ([]Feature, error) {
+func (r *FileReader) DataRem() ([]flat.Feature, error) {
 	if r.numFeatures > 0 {
 		rem := r.numFeatures - r.featureIndex
-		p := make([]Feature, rem)
+		p := make([]flat.Feature, rem)
 		n, err := r.Data(p)
 		p = p[0:n]
 		if err != nil && err != io.EOF {
@@ -398,14 +400,14 @@ func (r *FileReader) DataRem() ([]Feature, error) {
 		}
 		return p, nil
 	} else {
-		p := make([]Feature, 1024)
+		p := make([]flat.Feature, 1024)
 		n, err := r.Data(p)
 		if err != nil && err != io.EOF {
 			return p[0:n], err
 		} else if err == io.EOF {
 			return p[0:n], nil
 		}
-		q := make([]Feature, 0, 2*len(p))
+		q := make([]flat.Feature, 0, 2*len(p))
 		q = append(q, p[0:n]...)
 		for {
 			n, err = r.Data(p)
@@ -485,7 +487,7 @@ func (r *FileReader) skipIndex() error {
 			if err != nil {
 				return r.toErr(err)
 			}
-			r.dataOffset = r.indexOffset + indexSize
+			r.dataOffset = r.indexOffset + int64(indexSize)
 			if _, err = s.Seek(r.dataOffset, io.SeekStart); err != nil {
 				return r.toErr(err)
 			}
@@ -495,10 +497,10 @@ func (r *FileReader) skipIndex() error {
 				return r.toErr(err)
 			}
 			bufSize := discardBufferSize
-			if indexSize < int64(bufSize) {
-				bufSize = int(indexSize)
+			if indexSize < bufSize {
+				bufSize = indexSize
 			}
-			if err = discard(r.r, make([]byte, bufSize), indexSize); err != nil {
+			if err = discard(r.r, make([]byte, bufSize), int64(indexSize)); err != nil {
 				return r.toErr(err)
 			}
 		}
@@ -532,7 +534,7 @@ func (r *FileReader) saveGenericOffset(s io.Seeker, offsetPtr *int64, name strin
 	return nil
 }
 
-func (r *FileReader) readFeature(f *Feature) (err error) {
+func (r *FileReader) readFeature(f *flat.Feature) (err error) {
 	// Read the feature length, which is a little-endian 32-bit integer.
 	b := make([]byte, flatbuffers.SizeUint32)
 	var n int

@@ -30,7 +30,7 @@ func TestHilbertSort(t *testing.T) {
 		// implementation of packedrtree.HilbertSort agrees with the
 		// canonical FlatGeobuf implementation as given by test data
 		// files taken from the flatgeobuf project.
-		err := filepath.WalkDir("testdata/flatgeobuf/", func(path string, d fs.DirEntry, err error) error {
+		err := filepath.WalkDir("../testdata/flatgeobuf/", func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
@@ -80,7 +80,7 @@ func TestHilbertSort(t *testing.T) {
 					b := buf.Bytes()
 					n, err := packedrtree.Size(index.NumRefs(), index.NodeSize())
 					require.NoError(t, err)
-					assert.Equal(t, n, int64(len(b)))
+					assert.Equal(t, n, len(b))
 
 					// Get the sub-slice of index bytes that contains the leaf
 					// nodes.
@@ -118,7 +118,6 @@ func TestHilbertSort(t *testing.T) {
 					// viable and also because someone else might have a
 					// use case for it.
 					assert.Equal(t, refs, sorted)
-
 				})
 			}
 			return nil

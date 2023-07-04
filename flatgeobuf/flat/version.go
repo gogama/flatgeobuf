@@ -2,13 +2,13 @@
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 
-package flatgeobuf
+package flat
 
 import _ "embed"
 
 var (
-	//go:embed "../script/version-flatc.txt"
+	//go:embed "version-flatc.txt"
 	flatcVersion string
-	//go:embed "../script/version-schema.txt"
+	//go:embed "version-schema.txt"
 	schemaVersion string
 )

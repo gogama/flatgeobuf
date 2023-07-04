@@ -37,5 +37,5 @@ fi
 # generating the files under `../flatgeobuf/flat/`.
 flatc --go -o ../flatgeobuf/ --go-namespace flat tmp/flatgeobuf/src/fbs/*.fbs
 
-(cd tmp/flatgeobuf && git describe --tags) >version-schema.txt
-flatc --version >version-flatc.txt
+(cd tmp/flatgeobuf && git describe --tags) >../flatgeobuf/flat/version-schema.txt
+flatc --version >../flatgeobuf/flat/version-flatc.txt

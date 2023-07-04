@@ -2,14 +2,5 @@
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 
+// Package flatgeobuf enables reading and writing FlatGeobuf files.
 package flatgeobuf
-
-import "github.com/gogama/flatgeobuf/flatgeobuf/flat"
-
-// TODO: Docs
-type Schema interface {
-	// TODO: Docs
-	ColumnsLength() int
-	// TODO: Docs
-	Columns(obj *flat.Column, j int) bool
-}
