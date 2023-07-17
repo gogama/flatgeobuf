@@ -9,8 +9,6 @@ import (
 )
 
 const (
-	// magicLen is the length of the FlatGeobuf magic number in bytes.
-	magicLen = 8
 	// MinSpecMajorVersion is the minimum major version of the
 	// FlatGeobuf specification that this package can read.
 	MinSpecMajorVersion = 0x03
@@ -23,6 +21,8 @@ const (
 	// is to impose some limitation, to prevent corrupted or malicious
 	// file headers from causing huge and pointless memory allocations.
 	headerMaxLen = 32 * 1024 * 1024
+	// magicLen is the length of the FlatGeobuf magic number in bytes.
+	magicLen = 8
 )
 
 // magic contains the FlatGeobuf magic number.
