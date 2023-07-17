@@ -29,7 +29,11 @@ type FileWriter struct {
 	featureIndex int
 }
 
-// TODO: Docs
+// NewFileWriter creates a new FlatGeobuf file writer based on an
+// underlying output stream.
+//
+// The underlying writer must be positioned at the beginning of the
+// file, i.e. right before the FlatGeobuf magic number.
 func NewFileWriter(w io.Writer) *FileWriter {
 	if w == nil {
 		textPanic("nil writer")
@@ -37,15 +41,16 @@ func NewFileWriter(w io.Writer) *FileWriter {
 	return &FileWriter{w: w}
 }
 
-// TODO: Docs
-// TODO: BECAUSE FlatBuffers has such a horrendous serialization
+// Header writes the FlatGeobuf file magic number, followed by the given
+// FlatGeobuf header structure. The total number of bytes written,
+// including magic number and header bytes, is returned.
 //
-//		story, there's no general-purpose way to reliably know given
-//		a table what it's size is, and it might not even be contiguous
-//		in the buffer. THEREFORE, we require that the incoming table
-//		be a size-prefixed ROOT table existing at offset 0 in the buffer,
-//	 which is of course true of what our FileReader returns, but is not
-//	 generally true.
+// The input header table must be a size-prefixed root FlatBuffer table
+// positioned at offset 0 within its FlatBuffer. This type of value is
+// returned by FileReader.Header or from flat.GetSizePrefixedRootAsHeader.
+//
+// This method may only be called once, immediately after creating the
+// FileWriter via NewFileWriter.
 func (w *FileWriter) Header(hdr *flat.Header) (n int, err error) {
 	// Minimally validate incoming pointer.
 	if hdr == nil {
@@ -122,7 +127,15 @@ func (w *FileWriter) Header(hdr *flat.Header) (n int, err error) {
 	return
 }
 
-// TODO: Docs
+// Index serializes and writes an in-memory FlatGeobuf index data
+// structure to the index section of a FlatGeobuf file. The index node
+// size and feature count must match the corresponding header fields
+// written with Header. The total number of bytes written is returned.
+//
+// If used, this method must be called immediately after a successful
+// call to Header, and may only be called once. Alternatively, the
+// IndexData method may be used, or the index may be skipped and Data
+// may be called directly after Header.
 func (w *FileWriter) Index(index *packedrtree.PackedRTree) (n int, err error) {
 	if err = w.canWriteIndex(); err != nil {
 		return
@@ -157,7 +170,23 @@ func (w *FileWriter) index(index *packedrtree.PackedRTree) (n int, err error) {
 	return
 }
 
-// TODO: Docs
+// IndexData generates and writes an index for the given feature list,
+// to the index section of a FlatGeobuf file, and then writes the
+// features themselves into the data section. The input feature count
+// must match the feature count header field written with Header. The
+// total number of bytes written, to both index and data sections, is
+// returned.
+//
+// If used, this method must be called immediately after a successful
+// call to Header, and may only be called once. Alternatively, the Index
+// method may be used if you already have an index data structure ready
+// to serialize, or the index may be skipped and Data may be called
+// directly after Header.
+//
+// The input features are FlatBuffer tables. Each feature must be a
+// size-prefixed root table positioned at offset 0 within its buffer.
+// This type of value is returned by FileReader.Data,
+// FileReader.DataRem, and from flat.GetSizePrefixedRootAsFeature.
 func (w *FileWriter) IndexData(data []flat.Feature) (n int, err error) {
 	dataPtr := make([]*flat.Feature, len(data))
 	for i := range data {
@@ -167,6 +196,7 @@ func (w *FileWriter) IndexData(data []flat.Feature) (n int, err error) {
 }
 
 // TODO: Docs
+// TODO: It's my preference to delete this and just support IndexData.
 func (w *FileWriter) IndexDataPtr(data []*flat.Feature) (n int, err error) {
 	// Verify state.
 	if err = w.canWriteIndex(); err != nil {
@@ -226,6 +256,10 @@ func (w *FileWriter) IndexDataPtr(data []*flat.Feature) (n int, err error) {
 // TODO: Same issue as affecting Header and the IndexData* methods affects us
 //
 //	here: feature has to be a size-prefixed root table at offset 0
+//
+// FIXME: It would be simpler if this took a slice, and it would make a
+//
+//	better match with FileReader.
 func (w *FileWriter) Data(f *flat.Feature) (n int, err error) {
 	// Minimally validate incoming pointer.
 	if f == nil {
@@ -259,7 +293,11 @@ func (w *FileWriter) Data(f *flat.Feature) (n int, err error) {
 	return
 }
 
-// TODO: Docs
+// Close closes the FileWriter. All subsequent calls to any method will
+// return ErrClosed.
+//
+// If the underlying stream implements io.Closer, this method invokes
+// Close on the underlying stream and returns the result.
 func (w *FileWriter) Close() error {
 	if err := w.close(w.w); err != nil {
 		return err

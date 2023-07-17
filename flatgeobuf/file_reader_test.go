@@ -64,11 +64,11 @@ func TestHilbertSort(t *testing.T) {
 
 					// Read the Index.
 					index, err := r.Index()
-					require.NoError(t, err)
-					if index == nil {
+					if err == ErrNoIndex {
 						t.Log("Skipping file without index")
 						return
 					}
+					require.NotNil(t, index)
 					t.Log("I HAVE", index.NumRefs(), "REFS")
 
 					// Serialize the index.

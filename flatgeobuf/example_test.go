@@ -49,7 +49,7 @@ func ExampleFileReader_emptyFile() {
 	data, err := r.DataRem()
 	fmt.Printf("Data = %v, err = %v\n", data, err)
 	// Output: Header{Name:gps_mobile_tiles,Type:Polygon,NumColumns:6,NumFeatures:UNKNOWN,NO INDEX,CRS:{Org:EPSG,Code:4326,Name:WGS 84,WKT:821 bytes}}
-	// Index = <nil>, err = <nil>
+	// Index = <nil>, err = flatgeobuf: no index
 	// Data = [], err = <nil>
 }
 

@@ -10,9 +10,12 @@ import (
 )
 
 var (
-	// ErrNoIndex is returned when attempting to perform an index search
-	// on a FlatGeobuf file which does not contain an index.
+	// ErrNoIndex is returned when attempting to do an index read or
+	// search on a FlatGeobuf file that has no index.
 	ErrNoIndex = textErr("no index")
+	// ErrNotSeekable is returned from a FileReader's Rewind method if
+	// its underlying stream does not implement io.Seeker.
+	ErrNotSeekable = textErr("can't rewind: reader is not an io.Seeker")
 	// ErrClosed is returned when attempting to perform an operation on
 	// a FileReader or FileWriter which has been closed.
 	ErrClosed = textErr("closed")

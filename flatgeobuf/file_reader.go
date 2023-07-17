@@ -15,9 +15,10 @@ import (
 	flatbuffers "github.com/google/flatbuffers/go"
 )
 
-// FileReader reads an underlying stream as a FlatGeobuf file.
+// FileReader reads an underlying io.Reader stream as a FlatGeobuf file.
 //
-// TODO: Write docs.
+// The underlying stream may optionally implement io.Seeker to enable
+// streaming index searches via IndexSearch and Rewind.
 type FileReader struct {
 	stateful
 	// r is the stream to read from. It may also implement io.Seeker,
@@ -50,8 +51,15 @@ type FileReader struct {
 	featureOffset int64
 }
 
-// NewFileReader creates a new FlatGeobuf reader based on an underlying
-// reader.
+// NewFileReader creates a new FlatGeobuf file reader based on an
+// underlying input stream.
+//
+// The underlying reader must be positioned at the beginning of the
+// file, i.e. right before the FlatGeobuf magic number.
+//
+// If the underlying reader implements the io.Seeker interface and the
+// underlying FlatGeobuf file has an index, the index can be searched
+// in a streaming manner using the new FileReader's IndexSearch method.
 func NewFileReader(r io.Reader) *FileReader {
 	if r == nil {
 		textPanic("nil reader")
@@ -59,7 +67,12 @@ func NewFileReader(r io.Reader) *FileReader {
 	return &FileReader{r: r}
 }
 
-// TODO: Write docs.
+// Header reads and returns the FlatBuffer table containing the
+// FlatGeobuf file's header structure.
+//
+// This method may only be called once, immediately after creating the
+// FileReader via NewFileReader. Once the reader has advanced past the
+// header, it cannot be read again.
 func (r *FileReader) Header() (*flat.Header, error) {
 	// Transition into state for reading magic number.
 	if err := r.toState(uninitialized, beforeMagic); err == errUnexpectedState {
@@ -144,7 +157,17 @@ func (r *FileReader) Header() (*flat.Header, error) {
 	return hdr, nil
 }
 
-// TODO: Write docs.
+// Index reads and returns an in-memory implementation of the FlatGeobuf
+// file's index data structure. If the FlatGeobuf file nas no index, the
+// error ErrNoIndex is returned.
+//
+// This method may only be called immediately after a successful call to
+// Header or Rewind.
+//
+// As an alternative to calling Index, consider IndexSearch, which
+// combines reading the index data structure, searching it, and
+// returning the features for each qualified match in the search
+// results.
 func (r *FileReader) Index() (*packedrtree.PackedRTree, error) {
 	// Transition into state for reading index.
 	if err := r.toState(afterHeader, beforeIndex); err == errUnexpectedState {
@@ -156,7 +179,8 @@ func (r *FileReader) Index() (*packedrtree.PackedRTree, error) {
 	// If the node size is zero, there is no index and the reader is
 	// already pointing at the data section.
 	if r.nodeSize == 0 {
-		return nil, r.toState(beforeIndex, afterIndex)
+		r.toState(beforeIndex, afterIndex) // FIXME: Should be of the panicky variety.
+		return nil, ErrNoIndex
 	}
 
 	// If we know our underlying reader is seekable, we may cache its
@@ -214,7 +238,21 @@ func (r *FileReader) Index() (*packedrtree.PackedRTree, error) {
 	return prt, nil
 }
 
-// TODO: Write docs.
+// IndexSearch searches the FlatGeobuf file's index and returns the
+// FlatBuffer table corresponding to each data section feature whose
+// bounding box intersects the query box. If the FlatGeobuf file has
+// no index, the error ErrNoIndex is returned.
+//
+// This method may only be called immediately after a successful call to
+// Header or Rewind.
+//
+// If the underlying stream passed to NewFileReader implements the
+// io.Seeker interface, IndexSearch will perform a streaming search of
+// the index without needing to read the whole index into memory. This
+// allows efficient searches of random access capable streams, including
+// HTTP streams using HTTP range requests. Again if io.Seeker is
+// implemented, repeated streaming searches are enabled by calling
+// Rewind after each call to IndexSearch.
 func (r *FileReader) IndexSearch(b packedrtree.Box) ([]flat.Feature, error) {
 	// Searches are only allowed if the reader is positioned immediately
 	// after the header, either as a result of a Rewind(), or because of
@@ -330,7 +368,21 @@ func (r *FileReader) IndexSearch(b packedrtree.Box) ([]flat.Feature, error) {
 	return fs, nil
 }
 
-// TODO: Write docs.
+// Data reads up to len(p) feature structures from the FlatGeobuf data
+// section into p. If fewer than len(p) features remain to be read then
+// only the remaining features are read into p. The number of features
+// actually read is returned.
+//
+// This method may only be called once Header has been called. If a
+// previous call to Data has not been made since the last successful
+// Header or Rewind call, Data starts reading from the beginning of the
+// data section. Otherwise, it resumes reading from the position that
+// the last Data call left off.
+//
+// If no features remain to be read, the return value is a count of 0
+// and the error io.EOF. This method will never return io.EOF if the
+// count returned is positive; but any other I/O error maybe returned
+// with a positive count, for example io.ErrUnexpectedEOF.
 func (r *FileReader) Data(p []flat.Feature) (int, error) {
 	if r.err != nil {
 		return 0, r.err
@@ -377,6 +429,9 @@ func (r *FileReader) Data(p []flat.Feature) (int, error) {
 		}
 	}
 	if n == rem {
+		// FIXME: This is weird. the r.toState should be panicky, and
+		// it should never return io.EOF unless number of features read
+		// is 0.
 		if err := r.toState(inData, eof); err != nil {
 			return n, err
 		}
@@ -385,7 +440,14 @@ func (r *FileReader) Data(p []flat.Feature) (int, error) {
 	return n, nil
 }
 
-// TODO: Write docs.
+// DataRem reads and returns all remaining unread features from the
+// FlatGeobuf data section.
+//
+// This method may only be called once Header has been called. If a
+// previous call to Data has not been made since the last successful
+// Header or Rewind call, DataRem reads all features from the data
+// section. Otherwise, it reads all features remaining after the last
+// Data call left off.
 func (r *FileReader) DataRem() ([]flat.Feature, error) {
 	if r.numFeatures > 0 {
 		rem := r.numFeatures - r.featureIndex
@@ -421,7 +483,12 @@ func (r *FileReader) DataRem() ([]flat.Feature, error) {
 	}
 }
 
-// TODO: Write docs.
+// Rewind seeks the read position of the underlying stream to the
+// position directly after the FlatGeobuf header buffer, enabling
+// repeat calls to IndexSearch, Index, Data, or DataRem. Returns
+// ErrNotSeekable if the underlying stream does not implement io.Seeker.
+//
+// This method may only be called once Header has been called.
 func (r *FileReader) Rewind() error {
 	if r.err != nil {
 		return r.err
@@ -433,7 +500,7 @@ func (r *FileReader) Rewind() error {
 	if r.state < afterHeader {
 		return textErr(errHeaderNotCalled)
 	} else if r.indexOffset == 0 {
-		return textErr("can't rewind: reader is not an io.Seeker")
+		return ErrNotSeekable
 	}
 
 	// Reset state to just after reading the header, but lazily do not
@@ -445,7 +512,11 @@ func (r *FileReader) Rewind() error {
 	return nil
 }
 
-// TODO: Write docs.
+// Close closes the FileReader. All subsequent calls to any method will
+// return ErrClosed.
+//
+// If the underlying stream implements io.Closer, this method invokes
+// Close on the underlying stream and returns the result.
 func (r *FileReader) Close() error {
 	return r.close(r.r)
 }
