@@ -7,7 +7,7 @@ performant binary encoding for geographic data based on
 ## Project Status
 
 Advancing rapidly toward alpha status. An alpha cut is expected by
-August 31, 2023 and a `v1.0.0` by mid-November 2023 at the latest.
+December 31, 2023 and a `v1.0.0` by mid-February 2023 at the latest.
 
 You can already peruse the documentation at the official Go docs
 website, [here](https://pkg.go.dev/github.com/gogama/flatgeobuf).
