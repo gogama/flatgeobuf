@@ -12,7 +12,7 @@ import (
 	flatbuffers "github.com/google/flatbuffers/go"
 )
 
-// PropWriter writes a list of key value pairs in FlatGeobuf property
+// PropWriter writes a list of key/value pairs in FlatGeobuf property
 // format to an underlying stream.
 type PropWriter struct {
 	w io.Writer

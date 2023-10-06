@@ -20,6 +20,24 @@ coming soon.
 
 coming soon.
 
+## FlatGeobuf Format Primer
+
+Find detailed FlatGeobuf file format documentation at
+[flatgeobuf.org](https://flatgeobuf.org/). The short form explanation
+is that the FlatGeobuf format is really *four* different formats in one. 
+
+- H: The Header format, which is a variable-sized FlatBuffer
+  [table](https://github.com/flatgeobuf/flatgeobuf/blob/master/src/fbs/header.fbs#L67-L82).
+- I (optional): The optional Index format, which is a custom static
+  packed Hilbert R-tree index.
+- DATA: Sequence of Features, each of which is a variable-sized
+  FlatBuffer [table](https://github.com/flatgeobuf/flatgeobuf/blob/master/src/fbs/feature.fbs#L16-L20).
+- PROPERTIES: Each Feature contains a properties buffer which contains a
+  key/value pair sequence in a custom format.
+
+This library provides abstractions to cleanly and efficiently work with
+all four of the above formats.
+
 ## Package Map
 
 coming soon.

@@ -5,15 +5,16 @@
 package flatgeobuf
 
 import (
-	"github.com/gogama/flatgeobuf/flatgeobuf/flat"
 	"io"
 	"math"
 	"unsafe"
 
+	"github.com/gogama/flatgeobuf/flatgeobuf/flat"
+
 	flatbuffers "github.com/google/flatbuffers/go"
 )
 
-// PropReader reads a list of key value pairs in FlatGeobuf property
+// PropReader reads a list of key/value pairs in FlatGeobuf property
 // format from an underlying stream.
 //
 // FIXME: NEED TO DOCUMENT UNSAFE ASPECT -- They aren't allowed to mod
