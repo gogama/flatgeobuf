@@ -18,6 +18,9 @@ where you would read the magic and header, then jump to the end of the
 file and append while updating the feature count in the header.
 This would address the "append without index" use case suggested on the FlatGeobuf
 docs site.
+2. Add an orb compatibility package for feature conversion? The orb
+   dependency would be ring-fenced to this sub-package so that other
+   consumers don't need orb.
 
 TODO:
 1. If I'm committing to Go 1.20 due to unsafe.String, then:
