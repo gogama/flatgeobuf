@@ -1,14 +1,13 @@
 NEXT STEPS:
-    1. Normalize FileWriter interface by dropping IndexDataPtr and
+    1. Unit test property reader/property writer.
+    2. Normalize FileWriter interface by dropping IndexDataPtr and
        changing Data signature.
-    2. Document property reader/property writer.
-    3. Document schema and stringers.
-    4. Fix stateful issues and finalize.
-    5. Cut v0.9.0-alpha.
-    6. Request feedback.
-    7. Finish unit testing package flatgeobuf.
-    8. Cut v0.9.5-beta.
-    7. Cut v1.0.0.
+    3. Fix stateful issues and finalize.
+    4. Cut v0.9.0-alpha.
+    5. Request feedback.
+    6. Finish unit testing package flatgeobuf.
+    7. Cut v0.9.5-beta.
+    8. Cut v1.0.0.
 
 Future directions:
 1. Another interesting interaction system would be an Appender which

@@ -606,7 +606,8 @@ func (r *FileReader) saveGenericOffset(s io.Seeker, offsetPtr *int64, name strin
 }
 
 func (r *FileReader) readFeature(f *flat.Feature) (err error) {
-	// Read the feature length, which is a little-endian 32-bit integer.
+	// Read the feature length, which is a little-endian unsigned 32-bit
+	// integer.
 	b := make([]byte, flatbuffers.SizeUint32)
 	var n int
 	n, err = io.ReadFull(r.r, b)
@@ -627,8 +628,8 @@ func (r *FileReader) readFeature(f *flat.Feature) (err error) {
 		return r.toErr(wrapErr("failed to read feature[%d] (offset %d, len=%d)", err, r.featureIndex, r.featureOffset, featureLen))
 	}
 
-	// Read the uoffset_t that prefixes the tables bytes and which tells
-	// us where the data starts.
+	// Read the uoffset_t that prefixes the tables bytes and tells us
+	// where the data starts.
 	tblOffset := flatbuffers.GetUOffsetT(tbl[flatbuffers.SizeUint32:])
 
 	// Convert the feature table into a size-prefixed FlatBuffer which

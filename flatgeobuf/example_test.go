@@ -5,14 +5,17 @@
 package flatgeobuf_test
 
 import (
+	"bytes"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"sort"
 
-	"github.com/gogama/flatgeobuf/flatgeobuf/flat"
-
 	"github.com/gogama/flatgeobuf/flatgeobuf"
+	"github.com/gogama/flatgeobuf/flatgeobuf/flat"
 	"github.com/gogama/flatgeobuf/packedrtree"
+
+	flatbuffers "github.com/google/flatbuffers/go"
 )
 
 func openFile(name string) *os.File {
@@ -158,4 +161,46 @@ func ExampleFileReader_IndexSearch_streaming() {
 	// Output: Header{Name:US__counties,Envelope:[-179.14734,17.884813,179.77847,71.352561],Type:Unknown,NumColumns:6,NumFeatures:3221,NodeSize:16,CRS:{Org:EPSG,Code:4269,Name:NAD83,WKT:1280 bytes}}
 	// First search, first Result: Feature{Geometry:{Type:MultiPolygon,Bounds:[-88.263572,41.469555,-87.524044,42.154265]},Properties:{STATE_FIPS:17,COUNTY_FIP:031,FIPS:17031,STATE:IL,NAME:Cook,LSAD:County}}
 	// Second search, first Result: Feature{Geometry:{Type:MultiPolygon,Bounds:[-113.33438,32.504938,-111.03991,34.04817]},Properties:{STATE_FIPS:04,COUNTY_FIP:013,FIPS:04013,STATE:AZ,NAME:Maricopa,LSAD:County}}
+}
+
+func Example_PropReader() {
+	// Start with a byte buffer containing three trivial properties.
+	//
+	// Normally you would obtain this buffer using the PropertiesBytes()
+	// method of a flat.Feature, but we omit that part for simplicity.
+	propBytes, _ := hex.DecodeString("03000000666f6f2408202001")
+
+	// Read the three properties.
+	pr := flatgeobuf.NewPropReader(bytes.NewReader(propBytes))
+	str, _ := pr.ReadString()
+	u, _ := pr.ReadUInt()
+	b, _ := pr.ReadBool()
+
+	fmt.Printf(`"%s" 0x%x %t`, str, u, b)
+	// Output: "foo" 0x20200824 true
+}
+
+func Example_PropWriter() {
+	var buf bytes.Buffer
+	pw := flatgeobuf.NewPropWriter(&buf)
+
+	// Serialize the properties to a byte buffer in the FlatGeobuf
+	// properties format.
+	pw.WriteString("foo")
+	pw.WriteUInt(0x20200824)
+	pw.WriteBool(true)
+	props := buf.Bytes()
+
+	// Attach the properties to a FlatGeobuf feature. (Feature type and
+	// geometry, which are required for a meaningful feature, are
+	// omitted from this example to keep it lean.)
+	bldr := flatbuffers.NewBuilder(0)
+	propsOffset := bldr.CreateByteVector(props)
+	flat.FeatureStart(bldr)
+	flat.FeatureAddProperties(bldr, propsOffset)
+	ftrOffset := flat.FeatureEnd(bldr)
+	flat.FinishSizePrefixedFeatureBuffer(bldr, ftrOffset)
+
+	fmt.Printf("props: %s, propsOffset: %d, ftrOffset: %d", hex.EncodeToString(props), propsOffset, ftrOffset)
+	// Output: props: 03000000666f6f2408202001, propsOffset: 16, ftrOffset: 24
 }
