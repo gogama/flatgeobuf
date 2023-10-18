@@ -3,8 +3,10 @@ NEXT STEPS:
     2. Cut v0.9.0-alpha.
     3. Request feedback.
     4. Finish unit testing package flatgeobuf.
-    5. Cut v0.9.5-beta.
-    6. Cut v1.0.0.
+    5. If possible, fix openFile to perhaps embed the test data files
+       if that will make the examples run on pkg.go.dev?
+    6. Cut v0.9.5-beta.
+    7. Cut v1.0.0.
 
 Future directions:
 1. Another interesting interaction system would be an Appender which
