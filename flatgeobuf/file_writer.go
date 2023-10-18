@@ -186,35 +186,25 @@ func (w *FileWriter) index(index *packedrtree.PackedRTree) (n int, err error) {
 // size-prefixed root table positioned at offset 0 within its buffer.
 // This type of value is returned by FileReader.Data,
 // FileReader.DataRem, and from flat.GetSizePrefixedRootAsFeature.
-func (w *FileWriter) IndexData(data []flat.Feature) (n int, err error) {
-	dataPtr := make([]*flat.Feature, len(data))
-	for i := range data {
-		dataPtr[i] = &data[i]
-	}
-	return w.IndexDataPtr(dataPtr)
-}
-
-// TODO: Docs
-// TODO: It's my preference to delete this and just support IndexData.
-func (w *FileWriter) IndexDataPtr(data []*flat.Feature) (n int, err error) {
+func (w *FileWriter) IndexData(p []flat.Feature) (n int, err error) {
 	// Verify state.
 	if err = w.canWriteIndex(); err != nil {
 		return
 	}
 
 	// Create index.
-	refs := make([]packedrtree.Ref, len(data))
+	refs := make([]packedrtree.Ref, len(p))
 	bounds := packedrtree.EmptyBox
 	var i int
 	err = safeFlatBuffersInteraction(func() error {
 		var offset int64
-		for i = range data {
+		for i = range p {
 			refs[i].Offset = offset
 			var size uint32
-			if size, err = tableSize(data[i].Table()); err != nil {
+			if size, err = tableSize(p[i].Table()); err != nil {
 				return wrapErr("feature %d", err, i)
 			}
-			err = featureBounds(&refs[i].Box, data[i])
+			err = featureBounds(&refs[i].Box, &p[i])
 			if err != nil {
 				return wrapErr("feature %d", err, i)
 			}
@@ -239,49 +229,54 @@ func (w *FileWriter) IndexDataPtr(data []*flat.Feature) (n int, err error) {
 	}
 
 	// Write the data.
-	for i = range data {
-		var o int
-		o, err = w.Data(data[i])
-		n += o
-		if err != nil {
-			return
-		}
-	}
+	var o int
+	o, err = w.Data(p)
+	n += o
 
-	// Successfully wrote all the data.
+	// Either all the features have been written, or an error occurred
+	// writing a feature.
 	return
 }
 
-// TODO: Same issue as affecting Header and the IndexData* methods affects us
+// Data writes features into the data section. If the feature count
+// field written with Header is non-zero, then the input feature count,
+// plus the count of features already written, may not exceed file
+// feature count. The total number of bytes written is returned.
 //
-//	here: feature has to be a size-prefixed root table at offset 0
+// This method may only be called after Header has been called. If a
+// positive index node size was indicated with Header, then it may only
+// be called after Index has been called. This method may be called
+// repeatedly to stream as many features as desired into the data
+// section, as long as total number of features written does not exceed
+// a positive feature count written with Header.
 //
-// FIXME: It would be simpler if this took a slice, and it would make a
-//
-//	better match with FileReader.
-func (w *FileWriter) Data(f *flat.Feature) (n int, err error) {
-	// Minimally validate incoming pointer.
-	if f == nil {
-		textPanic("nil feature")
-	}
-
-	// Ensure we can write another feature.
-	if err = w.canWriteData(); err != nil {
+// The input features are FlatBuffer tables. Each feature must be a
+// size-prefixed root table positioned at offset 0 within its buffer.
+// This type of value is returned by FileReader.Data,
+// FileReader.DataRem, and from flat.GetSizePrefixedRootAsFeature.
+func (w *FileWriter) Data(p []flat.Feature) (n int, err error) {
+	// Ensure we can fit all the requested features.
+	if err = w.canWriteData(len(p)); err != nil {
 		return
 	}
 
 	// Enter feature writing state.
 	w.state = inData
 
-	// Write the feature.
-	if n, err = writeSizePrefixedTable(w.w, f.Table()); err != nil {
-		err = wrapErr("failed to write feature %d", err, w.featureIndex)
-		if n > 0 {
-			_ = w.toErr(err)
+	// Write each feature.
+	for i := range p {
+		var m int
+		m, err = writeSizePrefixedTable(w.w, p[i].Table())
+		n += m
+		if err != nil {
+			err = wrapErr("failed to write feature %d at data index %d", err, i, w.featureIndex)
+			if m > 0 {
+				_ = w.toErr(err)
+			}
+			return
 		}
-		return
+		w.featureIndex++
 	}
-	w.featureIndex++
 
 	// Check for EOF.
 	if w.featureIndex == w.numFeatures && w.numFeatures > 0 {
@@ -326,7 +321,7 @@ func (w *FileWriter) canWriteIndex() error {
 	return nil
 }
 
-func (w *FileWriter) canWriteData() error {
+func (w *FileWriter) canWriteData(n int) error {
 	if w.err != nil {
 		return w.err
 	}
@@ -343,6 +338,10 @@ func (w *FileWriter) canWriteData() error {
 		return fmtErr("all %d features indicated in header already written", w.numFeatures)
 	default:
 		fmtPanic("logic error: unexpected state 0x%x looking to write data", w.state)
+	}
+	if w.numFeatures > 0 && w.numFeatures-w.featureIndex-n < 0 {
+		excess := n - (w.numFeatures - w.featureIndex)
+		return fmtErr("%d of %d features indicated in header already written, writing %d more would create an excess of %d", w.featureIndex, w.numFeatures, n, excess)
 	}
 	return nil
 }

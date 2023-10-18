@@ -1,12 +1,10 @@
 NEXT STEPS:
-    1. Normalize FileWriter interface by dropping IndexDataPtr and
-       changing Data signature.
-    2. Fix stateful issues and finalize.
-    3. Cut v0.9.0-alpha.
-    4. Request feedback.
-    5. Finish unit testing package flatgeobuf.
-    6. Cut v0.9.5-beta.
-    7. Cut v1.0.0.
+    1. Fix stateful issues and finalize.
+    2. Cut v0.9.0-alpha.
+    3. Request feedback.
+    4. Finish unit testing package flatgeobuf.
+    5. Cut v0.9.5-beta.
+    6. Cut v1.0.0.
 
 Future directions:
 1. Another interesting interaction system would be an Appender which

@@ -370,7 +370,7 @@ func (r *FileReader) IndexSearch(b packedrtree.Box) ([]flat.Feature, error) {
 // Data reads up to len(p) feature structures from the FlatGeobuf data
 // section into p. If fewer than len(p) features remain to be read then
 // only the remaining features are read into p. The number of features
-// actually read is returned.
+// (not bytes!) actually read is returned.
 //
 // This method may only be called once Header has been called. If a
 // previous call to Data has not been made since the last successful
