@@ -17,13 +17,14 @@ import (
 //
 // Each FlatGeobuf feature table (flat.Feature) contains an optional
 // byte  array field named Properties which is encoded in its own custom
-// format, a format-within-a-format. PropWriter knows how to write this
-// special format-within-a-format.
+// format, a format-within-a-format, if you will. PropWriter knows how
+// to write this special format-within-a-format.
 //
 // A typical usage pattern is to write the properties for a feature to
-// a byte slice using a PropWriter, render the byte slice as a byte
-// vector into a flatbuffers.Builder, and then supplying the vector
-// offset using flat.FeatureAddProperties.
+// a byte buffer using a PropWriter, convert the buffer containing the
+// properties into a FlatBuffer byte vector (with flatbuffers.Builder),
+// and finally supply the vector offset when building the feature using
+// flat.FeatureAddProperties.
 //
 // Use WriteString for flat.ColumnTypeString and flat.ColumnTypeDateTime.
 // Use WriteBinary for flat.ColumnTypeBinary and flat.ColumnTypeJson.

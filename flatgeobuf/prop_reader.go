@@ -21,8 +21,8 @@ import (
 //
 // Each FlatGeobuf feature table (flat.Feature) contains an optional
 // byte array field named Properties which is encoded in its own custom
-// format, a format-within-a-format. PropRead knows how to read this
-// special format-within-a-format.
+// format, a format-within-a-format, if you will. PropReader knows how
+// to read this special format-within-a-format.
 //
 // To read all properties at once for a given feature property Schema,
 // use ReadSchema.
