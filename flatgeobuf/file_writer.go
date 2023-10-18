@@ -9,7 +9,6 @@ import (
 	"math"
 
 	"github.com/gogama/flatgeobuf/flatgeobuf/flat"
-
 	"github.com/gogama/flatgeobuf/packedrtree"
 )
 

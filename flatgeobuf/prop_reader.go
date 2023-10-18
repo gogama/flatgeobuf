@@ -5,12 +5,14 @@
 package flatgeobuf
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"math"
+	"strings"
 	"unsafe"
 
 	"github.com/gogama/flatgeobuf/flatgeobuf/flat"
-
 	flatbuffers "github.com/google/flatbuffers/go"
 )
 
@@ -82,7 +84,7 @@ func (r *PropReader) ReadShort() (int16, error) {
 	if err != nil {
 		return 0, err
 	}
-	return int16(b[0]) | int16(b[1]<<8), nil
+	return int16(b[0]) | int16(b[1])<<8, nil
 }
 
 // ReadUShort reads the value of a flat.ColumnTypeUShort property (a
@@ -93,7 +95,7 @@ func (r *PropReader) ReadUShort() (uint16, error) {
 	if err != nil {
 		return 0, err
 	}
-	return uint16(b[0]) | uint16(b[1]<<8), nil
+	return uint16(b[0]) | uint16(b[1])<<8, nil
 }
 
 // ReadInt writes the value of a flat.ColumnTypeInt property (a 32-bit
@@ -104,7 +106,7 @@ func (r *PropReader) ReadInt() (int32, error) {
 	if err != nil {
 		return 0, err
 	}
-	return int32(b[0]) | int32(b[1]<<8) | int32(b[2]<<16) | int32(b[3]<<24), nil
+	return int32(b[0]) | int32(b[1])<<8 | int32(b[2])<<16 | int32(b[3])<<24, nil
 }
 
 // ReadUInt reads the value of a flat.ColumnTypeUInt property (a 32-bit
@@ -218,32 +220,74 @@ type PropValue struct {
 	Type flat.ColumnType
 }
 
+func (val PropValue) String() string {
+	var name []byte
+	_ = safeFlatBuffersInteraction(func() error {
+		name = val.Col.Name()
+		return nil
+	})
+
+	var b strings.Builder
+	if name != nil {
+		b.WriteString("PropValue{Name:\"")
+		b.Write(name)
+		b.WriteString("\",")
+	} else {
+		b.WriteString("PropValue{")
+	}
+
+	_, _ = fmt.Fprintf(&b, "Type:%s,Value:", val.Type)
+
+	switch val.Type {
+	case flat.ColumnTypeUByte, flat.ColumnTypeUShort, flat.ColumnTypeUInt, flat.ColumnTypeULong:
+		_, _ = fmt.Fprintf(&b, "0x%x", val.Value)
+	case flat.ColumnTypeBool:
+		_, _ = fmt.Fprintf(&b, "%t", val.Value)
+	case flat.ColumnTypeString:
+		_, _ = fmt.Fprintf(&b, "%q", val.Value)
+	default:
+		_, _ = fmt.Fprintf(&b, "%v", val.Value)
+	}
+
+	_, _ = fmt.Fprintf(&b, ",ColIndex:%d}", val.ColIndex)
+
+	return b.String()
+}
+
 // ReadSchema all properties specified in the given Schema, returning
 // them as a slice of PropValue structures.
 //
 // The concrete implementation of the schema will typically be a
 // *flat.Header or a *flat.Feature.
 func (r *PropReader) ReadSchema(schema Schema) ([]PropValue, error) {
-	// TODO: Is a safeFlatBuffersInteraction desirable here to avoid panics?
-	n := schema.ColumnsLength()
+	var n int
+	if err := safeFlatBuffersInteraction(func() error {
+		n = schema.ColumnsLength()
+		return nil
+	}); err != nil {
+		return nil, wrapErr("failed to read schema column count", err)
+	}
 	vals := make([]PropValue, 0, n)
 
-	for {
+	for i := 0; i < n; i++ {
 		col, err := r.ReadUShort()
-		if err == io.EOF {
-			return vals, nil
-		} else if err != nil {
-			return nil, fmtErr("error reading column index")
+		if err != nil {
+			return nil, wrapErr("failed to read column index (for property %d of %d)", err, i, n)
 		}
-		i := int(col)
-		if i >= n {
-			return nil, fmtErr("column index %d not in schema (%d columns)", i, n)
+		j := int(col)
+		if j >= n {
+			return nil, fmtErr("schema has only %d columns, but property %d has column index %d", n, i, j)
 		}
 		val := PropValue{
 			ColIndex: col,
 		}
-		if !schema.Columns(&val.Col, i) {
-			return nil, fmtErr("schema failed to locate column %d", i)
+		if err = safeFlatBuffersInteraction(func() error {
+			if !schema.Columns(&val.Col, j) {
+				return errors.New("column not found")
+			}
+			return nil
+		}); err != nil {
+			return nil, wrapErr("failed to fetch column %d (for property %d of %d)", err, j, i, n)
 		}
 		val.Type = val.Col.Type()
 		switch val.Type {
@@ -278,4 +322,6 @@ func (r *PropReader) ReadSchema(schema Schema) ([]PropValue, error) {
 		}
 		vals = append(vals, val)
 	}
+
+	return vals, nil
 }

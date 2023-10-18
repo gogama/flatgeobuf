@@ -10,7 +10,6 @@ import (
 	"sort"
 
 	"github.com/gogama/flatgeobuf/flatgeobuf/flat"
-
 	"github.com/gogama/flatgeobuf/packedrtree"
 	flatbuffers "github.com/google/flatbuffers/go"
 )

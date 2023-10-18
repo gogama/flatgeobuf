@@ -13,11 +13,13 @@ import "github.com/gogama/flatgeobuf/flatgeobuf/flat"
 // Both the header structure (flat.Header) for a FlatGeobuf file and an
 // individual feature within the data section (flat.Feature) implement
 // Schema. When provided on the header table, the Schema applies to all
-// features in the file except those that have their own schema's. When
+// features in the file except those that have their own schemas. When
 // provided on an individual feature, the Schema applies only to that
 // feature.
 //
-// Use PropReader.ReadSchema to read all properties
+// Use PropReader.ReadSchema to read all properties from a FlatGeobuf
+// properties buffer that is serialized according to a particular
+// schema.
 type Schema interface {
 	// ColumnsLength returns the number of columns, i.e. properties, in
 	// the schema.

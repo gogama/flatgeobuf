@@ -40,7 +40,7 @@ type SpecVersion struct {
 	Patch uint8
 }
 
-// Magic reads the FlatGeobuf magic number from a stream and if it is
+// Magic reads the FlatGeobuf magic number from a stream and, if it is
 // valid, returns the FlatGeobuf specification version. This function
 // can be used to test whether any file seems to be in the FlatGeobuf
 // format. However, it does not read beyond the magic number.

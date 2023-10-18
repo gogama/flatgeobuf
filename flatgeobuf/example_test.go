@@ -14,7 +14,6 @@ import (
 	"github.com/gogama/flatgeobuf/flatgeobuf"
 	"github.com/gogama/flatgeobuf/flatgeobuf/flat"
 	"github.com/gogama/flatgeobuf/packedrtree"
-
 	flatbuffers "github.com/google/flatbuffers/go"
 )
 
@@ -81,7 +80,7 @@ func ExampleFileReader_unknownFeatureCount() {
 		fmt.Printf("len(Data) -> %d, Data[0] -> %s\n", len(data), flatgeobuf.FeatureString(&data[0], hdr))
 	}
 	// Output: Header{Name:gps_mobile_tiles,Type:Polygon,NumColumns:6,NumFeatures:UNKNOWN,NO INDEX,CRS:{Org:EPSG,Code:4326,Name:WGS 84,WKT:821 bytes}}
-	// len(Data) -> 1, Data[0] -> Feature{Geometry:{Type:Unknown,Bounds:[-69.911499,18.458768,-69.906006,18.463979]},Properties:{quadkey:0322113021201023,avg_d_kbps:237,avg_u_kbps:196,avg_lat_ms:36,tests:98,devices:49}}
+	// len(Data) -> 1, Data[0] -> Feature{Geometry:{Type:Unknown,Bounds:[-69.911499,18.458768,-69.906006,18.463979]},Properties:{quadkey:0322113021201023,avg_d_kbps:16109,avg_u_kbps:11204,avg_lat_ms:36,tests:98,devices:49}}
 }
 
 // TODO: Explain this example somewhere.
@@ -163,31 +162,109 @@ func ExampleFileReader_IndexSearch_streaming() {
 	// Second search, first Result: Feature{Geometry:{Type:MultiPolygon,Bounds:[-113.33438,32.504938,-111.03991,34.04817]},Properties:{STATE_FIPS:04,COUNTY_FIP:013,FIPS:04013,STATE:AZ,NAME:Maricopa,LSAD:County}}
 }
 
-func Example_PropReader() {
+func ExamplePropReader() {
 	// Start with a byte buffer containing three trivial properties.
 	//
 	// Normally you would obtain this buffer using the PropertiesBytes()
 	// method of a flat.Feature, but we omit that part for simplicity.
-	propBytes, _ := hex.DecodeString("03000000666f6f2408202001")
+	propBytes, _ := hex.DecodeString("000003000000666f6f010024082020020001")
 
-	// Read the three properties.
+	// Read the three properties. Error handling is omitted for brevity.
+	//
+	// If your column schema can vary, or you just want a simpler
+	// interface to read properties, you may want to use the ReadSchema
+	// method to read all properties at once.
 	pr := flatgeobuf.NewPropReader(bytes.NewReader(propBytes))
-	str, _ := pr.ReadString()
-	u, _ := pr.ReadUInt()
-	b, _ := pr.ReadBool()
+	col, _ := pr.ReadUShort() // Column number
+	str, _ := pr.ReadString() // Property value
+	fmt.Printf("Column %d is the string value %q\n", col, str)
+	col, _ = pr.ReadUShort() // Column number
+	u, _ := pr.ReadUInt()    // Property value
+	fmt.Printf("Column %d is the unsigned integer value 0x%x\n", col, u)
+	col, _ = pr.ReadUShort() // Column number
+	b, _ := pr.ReadBool()    // Property value
+	fmt.Printf("Column %d is the boolean value %t\n", col, b)
 
-	fmt.Printf(`"%s" 0x%x %t`, str, u, b)
-	// Output: "foo" 0x20200824 true
+	// Output: Column 0 is the string value "foo"
+	// Column 1 is the unsigned integer value 0x20200824
+	// Column 2 is the boolean value true
 }
 
-func Example_PropWriter() {
+func simpleHeader() *flat.Header {
+	// Create a file-level schema using a flat.Header. This is just to
+	// facilitate the example ReadSchema code below. Normally you would
+	// get the schema from the flat.Header of the file you are reading
+	// or the current flat.Feature you are examining.
+	bldr := flatbuffers.NewBuilder(0)
+
+	col0Name := bldr.CreateString("A string")
+	col1Name := bldr.CreateString("An unsigned int")
+	col2Name := bldr.CreateString("A bool")
+
+	flat.ColumnStart(bldr) // Column 0
+	flat.ColumnAddName(bldr, col0Name)
+	flat.ColumnAddType(bldr, flat.ColumnTypeString)
+	col0 := flat.ColumnEnd(bldr)
+
+	flat.ColumnStart(bldr) // Column 1
+	flat.ColumnAddName(bldr, col1Name)
+	flat.ColumnAddType(bldr, flat.ColumnTypeUInt)
+	col1 := flat.ColumnEnd(bldr)
+
+	flat.ColumnStart(bldr) // Column 2
+	flat.ColumnAddName(bldr, col2Name)
+	flat.ColumnAddType(bldr, flat.ColumnTypeBool)
+	col2 := flat.ColumnEnd(bldr)
+
+	flat.HeaderStartColumnsVector(bldr, 3)
+	bldr.PrependUOffsetT(col2)
+	bldr.PrependUOffsetT(col1)
+	bldr.PrependUOffsetT(col0)
+	cols := bldr.EndVector(3)
+
+	flat.HeaderStart(bldr)
+	flat.HeaderAddColumns(bldr, cols)
+	hdr := flat.HeaderEnd(bldr)
+	flat.FinishSizePrefixedHeaderBuffer(bldr, hdr)
+	return flat.GetSizePrefixedRootAsHeader(bldr.FinishedBytes(), 0)
+}
+
+func ExamplePropReader_ReadSchema() {
+	// Get an example FlatGeobuf file header. Both *flat.Header and
+	// *flat.Feature implement Schema and can be used with ReadSchema.
+	hdr := simpleHeader()
+
+	// Start with a byte buffer containing three trivial properties
+	// which follows the schema from the above header.
+	//
+	// Normally you would obtain this buffer using the PropertiesBytes()
+	// method of a flat.Feature, but we omit that part for simplicity.
+	propBytes, _ := hex.DecodeString("000003000000666f6f010024082020020001")
+
+	// Read the properties.
+	pr := flatgeobuf.NewPropReader(bytes.NewReader(propBytes))
+	vals, _ := pr.ReadSchema(hdr)
+
+	// Print the properties.
+	fmt.Println(vals[0])
+	fmt.Println(vals[1])
+	fmt.Println(vals[2])
+	// Output: PropValue{Name:"A string",Type:String,Value:"foo",ColIndex:0}
+	// PropValue{Name:"An unsigned int",Type:UInt,Value:0x20200824,ColIndex:1}
+	// PropValue{Name:"A bool",Type:Bool,Value:true,ColIndex:2}
+}
+
+func ExamplePropWriter() {
 	var buf bytes.Buffer
 	pw := flatgeobuf.NewPropWriter(&buf)
 
 	// Serialize the properties to a byte buffer in the FlatGeobuf
 	// properties format.
+	pw.WriteUShort(0) // Column 0
 	pw.WriteString("foo")
+	pw.WriteUShort(1) // Column 1
 	pw.WriteUInt(0x20200824)
+	pw.WriteUShort(2) // Column 2
 	pw.WriteBool(true)
 	props := buf.Bytes()
 
@@ -202,5 +279,5 @@ func Example_PropWriter() {
 	flat.FinishSizePrefixedFeatureBuffer(bldr, ftrOffset)
 
 	fmt.Printf("props: %s, propsOffset: %d, ftrOffset: %d", hex.EncodeToString(props), propsOffset, ftrOffset)
-	// Output: props: 03000000666f6f2408202001, propsOffset: 16, ftrOffset: 24
+	// Output: props: 000003000000666f6f010024082020020001, propsOffset: 24, ftrOffset: 32
 }
