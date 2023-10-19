@@ -74,7 +74,7 @@ func NewFileReader(r io.Reader) *FileReader {
 // header, it cannot be read again.
 func (r *FileReader) Header() (*flat.Header, error) {
 	// Transition into state for reading magic number.
-	if err := r.toState(uninitialized, beforeMagic); err == errUnexpectedState {
+	if err := r.toState(uninitialized, beforeMagic, outside); err == errUnexpectedState {
 		return nil, textErr(errHeaderAlreadyCalled)
 	} else if err != nil {
 		return nil, err
@@ -90,9 +90,7 @@ func (r *FileReader) Header() (*flat.Header, error) {
 	}
 
 	// Transition into state for reading header.
-	if err = r.toState(beforeMagic, beforeHeader); err != nil {
-		return nil, err
-	}
+	_ = r.toState(beforeMagic, beforeHeader, inside)
 
 	// Read the header length, which is a little-endian 4-byte unsigned
 	// integer.
@@ -148,9 +146,7 @@ func (r *FileReader) Header() (*flat.Header, error) {
 	r.nodeSize = nodeSize
 
 	// Transition into state for reading index.
-	if err = r.toState(beforeHeader, afterHeader); err != nil {
-		return nil, err
-	}
+	_ = r.toState(beforeHeader, afterHeader, inside)
 
 	// Return the header.
 	return hdr, nil
@@ -169,7 +165,7 @@ func (r *FileReader) Header() (*flat.Header, error) {
 // results.
 func (r *FileReader) Index() (*packedrtree.PackedRTree, error) {
 	// Transition into state for reading index.
-	if err := r.toState(afterHeader, beforeIndex); err == errUnexpectedState {
+	if err := r.toState(afterHeader, beforeIndex, outside); err == errUnexpectedState {
 		return nil, r.indexStateErr(r.state)
 	} else if err != nil {
 		return nil, err
@@ -178,7 +174,7 @@ func (r *FileReader) Index() (*packedrtree.PackedRTree, error) {
 	// If the node size is zero, there is no index and the reader is
 	// already pointing at the data section.
 	if r.nodeSize == 0 {
-		r.toState(beforeIndex, afterIndex) // FIXME: Should be of the panicky variety.
+		_ = r.toState(beforeIndex, afterIndex, inside)
 		return nil, ErrNoIndex
 	}
 
@@ -195,9 +191,7 @@ func (r *FileReader) Index() (*packedrtree.PackedRTree, error) {
 		if _, err := s.Seek(r.dataOffset, io.SeekStart); err != nil {
 			return nil, r.toErr(wrapErr("failed to seek past cached index", err))
 		}
-		if err := r.toState(beforeIndex, afterIndex); err != nil {
-			return nil, err
-		}
+		_ = r.toState(beforeIndex, afterIndex, inside)
 		return r.cachedIndex, nil
 	}
 
@@ -229,9 +223,7 @@ func (r *FileReader) Index() (*packedrtree.PackedRTree, error) {
 	r.cachedIndex = prt
 
 	// Transition into state for reading feature data.
-	if err = r.toState(beforeIndex, afterIndex); err != nil {
-		return nil, err
-	}
+	_ = r.toState(beforeIndex, afterIndex, inside)
 
 	// Return the index.
 	return prt, nil
@@ -256,7 +248,7 @@ func (r *FileReader) IndexSearch(b packedrtree.Box) ([]flat.Feature, error) {
 	// Searches are only allowed if the reader is positioned immediately
 	// after the header, either as a result of a Rewind(), or because of
 	// a successful call to Header() immediately before.
-	if err := r.toState(afterHeader, beforeIndex); err == errUnexpectedState {
+	if err := r.toState(afterHeader, beforeIndex, outside); err == errUnexpectedState {
 		return nil, r.indexStateErr(r.state)
 	} else if err != nil {
 		return nil, err
@@ -312,15 +304,11 @@ func (r *FileReader) IndexSearch(b packedrtree.Box) ([]flat.Feature, error) {
 
 	// The reader's read cursor is now past the index and at the
 	// start of the data section.
-	if err := r.toState(beforeIndex, afterIndex); err != nil {
-		return nil, err
-	}
+	_ = r.toState(beforeIndex, afterIndex, inside)
 	if err := r.saveDataOffset(rs); err != nil {
 		return nil, err
 	}
-	if err := r.toState(afterIndex, inData); err != nil {
-		return nil, err
-	}
+	_ = r.toState(afterIndex, inData, inside)
 
 	// Create a helper function to skip over unnecessary features.
 	type skipFunc func(n int64) error
@@ -359,9 +347,7 @@ func (r *FileReader) IndexSearch(b packedrtree.Box) ([]flat.Feature, error) {
 	// Put the reader into EOF state so that it is not possible to make
 	// weird residual calls to Data() or DataRem() from the position of
 	// the last feature read.
-	if err := r.toState(inData, eof); err != nil {
-		return nil, err
-	}
+	_ = r.toState(inData, eof, inside)
 
 	// All search results are mapped to data features.
 	return fs, nil
@@ -391,6 +377,7 @@ func (r *FileReader) Data(p []flat.Feature) (int, error) {
 		if err := r.skipIndex(); err != nil {
 			return 0, err
 		}
+		r.state = inData
 	}
 
 	if r.state == afterIndex {
@@ -408,7 +395,7 @@ func (r *FileReader) Data(p []flat.Feature) (int, error) {
 		return 0, textErr(errHeaderNotCalled)
 	}
 
-	r.sanityCheckState()
+	_ = r.toState(inData, inData, inside) // Assert correct state.
 
 	n := len(p)
 	var rem int
@@ -418,24 +405,21 @@ func (r *FileReader) Data(p []flat.Feature) (int, error) {
 			n = rem
 		}
 	}
+
 	for i := 0; i < n; i++ {
 		err := r.readFeature(&p[i])
 		if r.numFeatures == 0 && err == errEndOfData {
-			_ = r.toState(inData, eof) // TODO: Fix all these internal toStates to just panic, not return error.
+			_ = r.toState(inData, eof, inside)
 			return i, io.EOF
 		} else if err != nil {
 			return i, err
 		}
 	}
+
 	if n == rem {
-		// FIXME: This is weird. the r.toState should be panicky, and
-		// it should never return io.EOF unless number of features read
-		// is 0.
-		if err := r.toState(inData, eof); err != nil {
-			return n, err
-		}
-		return n, io.EOF
+		_ = r.toState(inData, eof, inside)
 	}
+
 	return n, nil
 }
 
@@ -495,7 +479,6 @@ func (r *FileReader) Rewind() error {
 		return nil // No-Op
 	}
 
-	r.sanityCheckState()
 	if r.state < afterHeader {
 		return textErr(errHeaderNotCalled)
 	} else if r.indexOffset == 0 {
@@ -538,9 +521,7 @@ func (r *FileReader) indexStateErr(state state) error {
 
 func (r *FileReader) skipIndex() error {
 	// Transition into state for working with index.
-	if err := r.toState(afterHeader, beforeIndex); err != nil {
-		return err
-	}
+	_ = r.toState(afterHeader, beforeIndex, inside)
 
 	// Seek or read to the correct position.
 	if r.nodeSize > 0 {
@@ -577,7 +558,8 @@ func (r *FileReader) skipIndex() error {
 	}
 
 	// We're now in the correct position.
-	return r.toState(beforeIndex, afterIndex)
+	_ = r.toState(beforeIndex, afterIndex, inside)
+	return nil
 }
 
 func (r *FileReader) saveIndexOffset(s io.Seeker) error {

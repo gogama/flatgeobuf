@@ -15,7 +15,6 @@ type state int
 
 const (
 	uninitialized state = 0x00
-	invalid             = 0x01
 	beforeMagic         = 0x11
 	beforeHeader        = 0x21
 	afterHeader         = 0x22
@@ -23,6 +22,20 @@ const (
 	afterIndex          = 0x32
 	inData              = 0x42
 	eof                 = 0x52
+)
+
+type transitionType int
+
+const (
+	// An outside transition is the first state transition of a public
+	// method. If a public method has state transitions A -> B and then
+	// B -> C and C -> D, then A -> B is an outside transition.
+	outside transitionType = 0
+	// An inside transition is any state transition after the first one
+	// in a public method. If a public method has state transitions
+	// A -> B and then B -> C and C -> D, then B -> C and C -> D are
+	// inside transitions.
+	inside transitionType = 1
 )
 
 func (s *stateful) close(a interface{}) error {
@@ -41,14 +54,7 @@ func (s *stateful) close(a interface{}) error {
 	return nil
 }
 
-func (s *stateful) sanityCheckState() {
-	if s.state&invalid == invalid {
-		fmtPanic("logic error: invalid state 0x%x", s.state)
-	}
-}
-
-// FIXME: Internal state transitions within functions should panic, not return error.
-func (s *stateful) toState(expected, to state) (err error) {
+func (s *stateful) toState(expected, to state, tt transitionType) (err error) {
 	// Always fail if the reader's already in the error state.
 	if s.err != nil {
 		return s.err
@@ -61,8 +67,11 @@ func (s *stateful) toState(expected, to state) (err error) {
 		return nil
 	}
 
-	// Check for bad internal state.
-	s.sanityCheckState()
+	// Panic if an inside transition failed, as this represents a
+	// programming logic error.
+	if tt == inside {
+		fmtPanic("logic error: failed inside transition 0x%x -> 0x%x: real state is 0x%x", expected, to, s.state)
+	}
 
 	// Indicate that the state transition is invalid.
 	return errUnexpectedState

@@ -87,7 +87,7 @@ func (w *FileWriter) Header(hdr *flat.Header) (n int, err error) {
 	}
 
 	// Transition into state for writing magic number.
-	if err = w.toState(uninitialized, beforeMagic); err == errUnexpectedState {
+	if err = w.toState(uninitialized, beforeMagic, outside); err == errUnexpectedState {
 		err = textErr(errHeaderAlreadyCalled)
 		return
 	} else if err != nil {
@@ -103,9 +103,7 @@ func (w *FileWriter) Header(hdr *flat.Header) (n int, err error) {
 	}
 
 	// Transition into state for writing header.
-	if err = w.toState(beforeMagic, beforeHeader); err != nil {
-		return
-	}
+	_ = w.toState(beforeMagic, beforeHeader, inside)
 
 	// Write the header table.
 	m, err = writeSizePrefixedTable(w.w, hdr.Table())
@@ -120,7 +118,7 @@ func (w *FileWriter) Header(hdr *flat.Header) (n int, err error) {
 	w.nodeSize = nodeSize
 
 	// Transition into the state for writing index.
-	err = w.toState(beforeHeader, afterHeader)
+	_ = w.toState(beforeHeader, afterHeader, inside)
 
 	// Successfully wrote header.
 	return
@@ -165,7 +163,7 @@ func (w *FileWriter) index(index *packedrtree.PackedRTree) (n int, err error) {
 	}
 
 	// Transition into state for writing data.
-	err = w.toState(beforeIndex, afterIndex)
+	_ = w.toState(beforeIndex, afterIndex, inside)
 	return
 }
 
@@ -280,7 +278,7 @@ func (w *FileWriter) Data(p []flat.Feature) (n int, err error) {
 
 	// Check for EOF.
 	if w.featureIndex == w.numFeatures && w.numFeatures > 0 {
-		err = w.toState(inData, eof)
+		_ = w.toState(inData, eof, inside)
 	}
 
 	// Return.
@@ -313,7 +311,7 @@ func (w *FileWriter) canWriteIndex() error {
 		if w.nodeSize == 0 {
 			return textErr(errHeaderNodeSizeZero)
 		}
-	case afterIndex, inData, eof /* TODO: Does EOF make sense? */ :
+	case afterIndex, inData, eof:
 		return textErr(errWritePastIndex)
 	default:
 		fmtPanic("logic error: unexpected state 0x%x looking to write index", w.state)
