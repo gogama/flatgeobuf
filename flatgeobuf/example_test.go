@@ -26,7 +26,7 @@ func openFile(name string) *os.File {
 }
 
 func ExampleMagic() {
-	f := openFile("../testdata/flatgeobuf/poly00.fgb")
+	f := openFile("testdata/flatgeobuf/poly00.fgb")
 	defer f.Close()
 
 	version, err := flatgeobuf.Magic(f)
@@ -36,7 +36,7 @@ func ExampleMagic() {
 
 // TODO: Explain this example somewhere.
 func ExampleFileReader_emptyFile() {
-	r := flatgeobuf.NewFileReader(openFile("../testdata/flatgeobuf/empty.fgb"))
+	r := flatgeobuf.NewFileReader(openFile("testdata/flatgeobuf/empty.fgb"))
 	defer r.Close()
 
 	hdr, err := r.Header()
@@ -66,7 +66,7 @@ func ExampleFileReader_emptyFile() {
 // ......... remind myself that the example names are fine as is. This comment
 // ......... should be removed during documentation write.
 func ExampleFileReader_unknownFeatureCount() {
-	r := flatgeobuf.NewFileReader(openFile("../testdata/flatgeobuf/unknown_feature_count.fgb"))
+	r := flatgeobuf.NewFileReader(openFile("testdata/flatgeobuf/unknown_feature_count.fgb"))
 	defer r.Close()
 
 	hdr, err := r.Header()
@@ -85,7 +85,7 @@ func ExampleFileReader_unknownFeatureCount() {
 
 // TODO: Explain this example somewhere.
 func ExampleFileReader_Index() {
-	r := flatgeobuf.NewFileReader(openFile("../testdata/flatgeobuf/countries.fgb"))
+	r := flatgeobuf.NewFileReader(openFile("testdata/flatgeobuf/countries.fgb"))
 	defer r.Close()
 
 	hdr, err := r.Header()
@@ -124,7 +124,7 @@ func ExampleFileReader_Index() {
 
 // TODO: Explain this example somewhere.
 func ExampleFileReader_IndexSearch_streaming() {
-	r := flatgeobuf.NewFileReader(openFile("../testdata/flatgeobuf/UScounties.fgb"))
+	r := flatgeobuf.NewFileReader(openFile("testdata/flatgeobuf/UScounties.fgb"))
 	defer r.Close()
 
 	hdr, err := r.Header()

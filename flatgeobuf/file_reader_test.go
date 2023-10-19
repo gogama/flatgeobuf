@@ -30,7 +30,7 @@ func TestHilbertSort(t *testing.T) {
 		// implementation of packedrtree.HilbertSort agrees with the
 		// canonical FlatGeobuf implementation as given by test data
 		// files taken from the flatgeobuf project.
-		err := filepath.WalkDir("../testdata/flatgeobuf/", func(path string, d fs.DirEntry, err error) error {
+		err := filepath.WalkDir("testdata/flatgeobuf/", func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}

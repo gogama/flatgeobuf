@@ -58,9 +58,9 @@ Amazon S3, by wrapping the HTTP Range requests in an `io.ReadSeeker`.
 
 This project is licensed under the terms of the MIT License.
 
-Some `*.fgb` files in `testdata/` are copied from the official
-FlatGeobuf repository and licensed separately under the BSD-2-Clause
-License. See `testdata/flatgeobuf/LICENSE`.
+Some `*.fgb` files in `flatgeobuf/testdata/` are copied from the
+official FlatGeobuf repository and licensed separately under the
+BSD-2-Clause License. See `flatgeobuf/testdata/flatgeobuf/LICENSE`.
 
 The code in package `flat` is generated using `flatc` from the official
 GitHub repository's [FlatBuffer schema](https://github.com/flatgeobuf/flatgeobuf/tree/master/src/fbs).
