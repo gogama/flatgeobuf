@@ -34,8 +34,12 @@ func ExampleMagic() {
 	// Output: {Major:3 Patch:0}, <nil>
 }
 
-// TODO: Explain this example somewhere.
 func ExampleFileReader_emptyFile() {
+	// This simple example reads a trivial, empty, FlatGeobuf file. It
+	// opens the file, reads the FlatGeobuf header, attempts to read the
+	// index (but gets an error because the file has no index), and
+	// reads the data section, which contains no features.
+
 	r := flatgeobuf.NewFileReader(openFile("testdata/flatgeobuf/empty.fgb"))
 	defer r.Close()
 
@@ -55,17 +59,13 @@ func ExampleFileReader_emptyFile() {
 	// Data = [], err = <nil>
 }
 
-// TODO: Explain this example somewhere.
-// TODO: ... NOTE: My rename experiment failed - there's no way to make the Go
-// ......... doc framework generate example names with spaces or nice sentence
-// ......... case: the name `_unknown_feature_count` rendered as `Unknown_feature_count`
-// ......... which is uglier than `UnknownFeatureCount` so I put it back.
-// ......... see for example https://pkg.go.dev/net/http where there are example
-// ......... names like "DotFileHiding" and "StripPrefix" that show that that's
-// ......... just "now it is". I'm temporarily leaving this comment here to
-// ......... remind myself that the example names are fine as is. This comment
-// ......... should be removed during documentation write.
 func ExampleFileReader_unknownFeatureCount() {
+	// This example reads a FlatGeobuf file which has an unknown feature
+	// count, indicated by a zero in the header's feature count field.
+	// The FileReader's DataRem() method provides a one-liner read all
+	// available features at once. It is equivalent to using Data() in
+	// a loop until EOF is reached.
+
 	r := flatgeobuf.NewFileReader(openFile("testdata/flatgeobuf/unknown_feature_count.fgb"))
 	defer r.Close()
 
@@ -83,8 +83,14 @@ func ExampleFileReader_unknownFeatureCount() {
 	// len(Data) -> 1, Data[0] -> Feature{Geometry:{Type:Unknown,Bounds:[-69.911499,18.458768,-69.906006,18.463979]},Properties:{quadkey:0322113021201023,avg_d_kbps:16109,avg_u_kbps:11204,avg_lat_ms:36,tests:98,devices:49}}
 }
 
-// TODO: Explain this example somewhere.
 func ExampleFileReader_Index() {
+	// This example reads from a FlatGeobuf file which contains an
+	// index. It reads the entire index data structure into memory using
+	// the FileReader's Index() method, searches the index to find
+	// candidate features that may intersect a bounding box, then
+	// reads the data section up to the first candidate feature and
+	// prints a string summary of the candidate.
+
 	r := flatgeobuf.NewFileReader(openFile("testdata/flatgeobuf/countries.fgb"))
 	defer r.Close()
 
@@ -122,8 +128,13 @@ func ExampleFileReader_Index() {
 	// First Result: Feature{Geometry:{Type:MultiPolygon,Bounds:[-171.79111,18.91619,-66.96466,71.357764]},Properties:{id:USA,name:United States of America}}
 }
 
-// TODO: Explain this example somewhere.
 func ExampleFileReader_IndexSearch_streaming() {
+	// This example demonstrates a streaming index search of a
+	// FlatGeobuf file which contains an index. The FileReader's
+	// IndexSearch() function reads and searches the index and fetches
+	// all candidate features in a streaming manner, reading only the
+	// minimum necessary data into memory.
+
 	r := flatgeobuf.NewFileReader(openFile("testdata/flatgeobuf/UScounties.fgb"))
 	defer r.Close()
 
