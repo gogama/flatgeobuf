@@ -43,8 +43,8 @@ func fmtErr(format string, a ...interface{}) error {
 	return fmt.Errorf(packageName+format, a...)
 }
 
-func wrapErr(text string, err error, a ...interface{}) error {
-	return fmt.Errorf(packageName+text+": %w", append(a, err)...)
+func wrapErr(format string, err error, a ...interface{}) error {
+	return fmt.Errorf(packageName+format+": %w", append(a, err)...)
 }
 
 func textPanic(text string) {
