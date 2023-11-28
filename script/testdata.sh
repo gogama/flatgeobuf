@@ -34,4 +34,4 @@ rsync -av --delete \
   --include "*/" \
   --include "*.fgb" \
   --exclude "*" \
-  tmp/flatgeobuf/test/data/ ../testdata/flatgeobuf/
+  tmp/flatgeobuf/test/data/ ../flatgeobuf/testdata/flatgeobuf/
