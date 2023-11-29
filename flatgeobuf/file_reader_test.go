@@ -6,122 +6,268 @@ package flatgeobuf
 
 import (
 	"bytes"
+	"errors"
 	"io"
-	"io/fs"
-	"os"
-	"path/filepath"
-	"strings"
+	"strconv"
 	"testing"
-	"unsafe"
+
+	"github.com/stretchr/testify/mock"
 
 	"github.com/gogama/flatgeobuf/packedrtree"
-	flatbuffers "github.com/google/flatbuffers/go"
+
+	"github.com/gogama/flatgeobuf/flatgeobuf/flat"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// TODO: Real tests.
-
-func TestHilbertSort(t *testing.T) {
-	// TODO: Real test cases.
-
-	t.Run("Sanity", func(t *testing.T) {
-		// Sanity test that, somewhat indirectly, makes sure that our
-		// implementation of packedrtree.HilbertSort agrees with the
-		// canonical FlatGeobuf implementation as given by test data
-		// files taken from the flatgeobuf project.
-		err := filepath.WalkDir("testdata/flatgeobuf/", func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if !d.IsDir() && strings.HasSuffix(path, ".fgb") {
-				t.Run(path, func(t *testing.T) {
-					f, err := os.Open(path)
-					require.NoError(t, err)
-
-					t.Cleanup(func() {
-						err := f.Close()
-						require.NoError(t, err)
-					})
-
-					// Skip unsupported versions.
-					version, err := Magic(f)
-					require.NoError(t, err)
-					if version.Major < 3 {
-						t.Log("Skipping file version", version.Major, version.Patch)
-						return
-					} else {
-						_, err = f.Seek(0, io.SeekStart)
-						require.NoError(t, err)
-					}
-
-					// Open FlatGeobuf file reader.
-					r := NewFileReader(f)
-
-					// Skip the header.
-					_, err = r.Header()
-					require.NoError(t, err)
-
-					// Read the Index.
-					index, err := r.Index()
-					if err == ErrNoIndex {
-						t.Log("Skipping file without index")
-						return
-					}
-					require.NotNil(t, index)
-					t.Log("I HAVE", index.NumRefs(), "REFS")
-
-					// Serialize the index.
-					var buf bytes.Buffer
-					_, err = index.Marshal(&buf)
-					require.NoError(t, err)
-
-					// Get the raw index bytes.
-					b := buf.Bytes()
-					n, err := packedrtree.Size(index.NumRefs(), index.NodeSize())
-					require.NoError(t, err)
-					assert.Equal(t, n, len(b))
-
-					// Get the sub-slice of index bytes that contains the leaf
-					// nodes.
-					size := int(unsafe.Sizeof(packedrtree.Ref{}))
-					b = b[len(b)-index.NumRefs()*size:]
-
-					// Read the byte slice into Refs.
-					refs := make([]packedrtree.Ref, index.NumRefs())
-					bounds := packedrtree.EmptyBox
-					for i := range refs {
-						refs[i].XMin = flatbuffers.GetFloat64(b[i*size+000:])
-						refs[i].YMin = flatbuffers.GetFloat64(b[i*size+010:])
-						refs[i].XMax = flatbuffers.GetFloat64(b[i*size+020:])
-						refs[i].YMax = flatbuffers.GetFloat64(b[i*size+030:])
-						refs[i].Offset = flatbuffers.GetInt64(b[i*size+040:])
-						bounds.Expand(&refs[i].Box)
-					}
-
-					// Copy the Refs and Hilbert sort them.
-					sorted := make([]packedrtree.Ref, len(refs))
-					copy(sorted, refs)
-					packedrtree.HilbertSort(sorted, bounds)
-
-					// Verify the two slices are the same, thus ensuring
-					// that our implementation and Hilbert sorting
-					// produce the same results as the FlatGeobuf
-					// implementation that wrote the file.
-					//
-					// NOTE: If this assertion starts failing, it could
-					// mean there's a bug, or it could be related to the
-					// fact that HilbertSort isn't a stable sort. If it
-					// is the latter problem, I would be inclined to add
-					// an exported packedrtree.HilbertSortStable
-					// function mainly to enable this test to remain
-					// viable and also because someone else might have a
-					// use case for it.
-					assert.Equal(t, refs, sorted)
-				})
-			}
-			return nil
+func TestNewFileReader(t *testing.T) {
+	t.Run("Error", func(t *testing.T) {
+		t.Run("Nil Reader", func(t *testing.T) {
+			assert.PanicsWithValue(t, "flatgeobuf: nil reader", func() {
+				NewFileReader(nil)
+			})
 		})
-		assert.NoError(t, err)
+	})
+}
+
+func TestFileReader_Header(t *testing.T) {
+	t.Run("Error", func(t *testing.T) {
+		t.Run("Header Already Called", func(t *testing.T) {
+			testDataRunTests(t, func(t *testing.T, r *FileReader) {
+				hdr, err := r.Header()
+				require.NoError(t, err)
+				require.NotNil(t, hdr)
+
+				_, err = r.Header()
+
+				assert.EqualError(t, err, "flatgeobuf: Header() has already been called")
+			}, false, false, "empty.fgb")
+		})
+	})
+}
+
+func TestFileReader_Index(t *testing.T) {
+	// TODO
+}
+
+func TestFileReader_IndexSearch(t *testing.T) {
+	// TODO
+}
+
+func TestFileReader_Data(t *testing.T) {
+	// TODO
+}
+
+func TestFileReader_DataRem(t *testing.T) {
+	// TODO
+}
+
+func TestFileReader_Rewind(t *testing.T) {
+	t.Run("Error", func(t *testing.T) {
+		t.Run("Not Seekable", func(t *testing.T) {
+			r := testDataFileReader(t, false, "empty.fgb")
+			_, err := r.Header()
+			require.NoError(t, err)
+
+			err = r.Rewind()
+
+			assert.EqualError(t, err, "flatgeobuf: can't rewind: reader is not an io.Seeker")
+		})
+
+		t.Run("Header Not Called", func(t *testing.T) {
+			r := NewFileReader(&bytes.Buffer{})
+
+			err := r.Rewind()
+
+			assert.EqualError(t, err, "flatgeobuf: must call Header()")
+		})
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		t.Run("State: After Header", func(t *testing.T) {
+			testDataRunTests(t, func(t *testing.T, r *FileReader) {
+				hdr, err := r.Header()
+				require.NoError(t, err)
+				require.NotNil(t, hdr)
+
+				err = r.Rewind()
+
+				assert.NoError(t, err)
+			}, true, true)
+		})
+
+		t.Run("State: After Index", func(t *testing.T) {
+			testDataRunTests(t, func(t *testing.T, r *FileReader) {
+				hdr, err := r.Header()
+				require.NoError(t, err)
+				require.NotNil(t, hdr)
+				index1, err1 := r.Index()
+				if index1 != nil {
+					require.NoError(t, err)
+				} else {
+					require.ErrorIs(t, err1, ErrNoIndex)
+				}
+
+				err = r.Rewind()
+				assert.NoError(t, err)
+
+				index2, err2 := r.Index()
+				assert.Same(t, index1, index2) // Cached index or nil
+				assert.Equal(t, err1, err2)
+			}, true, true)
+		})
+
+		t.Run("State: In Data", func(t *testing.T) {
+			testDataRunTests(t, func(t *testing.T, r *FileReader) {
+				hdr, err := r.Header()
+				require.NoError(t, err)
+				p := make([]flat.Feature, 1)
+				m, err1 := r.Data(p)
+				if err1 != nil {
+					require.ErrorIs(t, err1, io.EOF)
+					require.Equal(t, 0, m)
+					require.Equal(t, hdr.FeaturesCount(), uint64(0))
+				} else {
+					require.Equal(t, 1, m)
+				}
+
+				err = r.Rewind()
+				assert.NoError(t, err)
+
+				q := make([]flat.Feature, 1)
+				n, err2 := r.Data(q)
+				assert.Equal(t, m, n)
+				assert.Equal(t, err1, err2)
+			}, true, true)
+		})
+
+		t.Run("State: EOF", func(t *testing.T) {
+			t.Run("After DataRem", func(t *testing.T) {
+				testDataRunTests(t, func(t *testing.T, r *FileReader) {
+					hdr, err := r.Header()
+					require.NoError(t, err)
+					require.NotNil(t, hdr)
+					p, err := r.DataRem()
+					require.NoError(t, err)
+
+					err = r.Rewind()
+					assert.NoError(t, err)
+
+					q, err := r.DataRem()
+					assert.NoError(t, err)
+					assert.Equal(t, p, q)
+				}, true, true)
+			})
+
+			t.Run("After IndexSearch", func(t *testing.T) {
+				testDataRunTests(t, func(t *testing.T, r *FileReader) {
+					hdr, err := r.Header()
+					require.NoError(t, err)
+					require.NotNil(t, hdr)
+					if hdr.IndexNodeSize() == 0 {
+						t.Skip("No index")
+					}
+					_, err = r.IndexSearch(packedrtree.Box{XMin: -180, YMin: -90, XMax: 180, YMax: 90})
+					require.NoError(t, err)
+
+					err = r.Rewind()
+					assert.NoError(t, err)
+				}, true, true)
+			})
+		})
+
+		t.Run("Repeated", func(t *testing.T) {
+			testDataRunTests(t, func(t *testing.T, r *FileReader) {
+				hdr, err := r.Header()
+				require.NoError(t, err)
+				require.NotNil(t, hdr)
+
+				n := 10
+				for i := 0; i < n; i++ {
+					t.Run(strconv.Itoa(i), func(t *testing.T) {
+						if i%2 == 0 {
+							_, _ = r.Index()
+						}
+						if i%3 == 0 {
+							_, err := r.DataRem()
+							require.NoError(t, err)
+						}
+
+						err := r.Rewind()
+						assert.NoError(t, err)
+					})
+				}
+			}, true, true)
+		})
+	})
+}
+
+type mockReadCloser struct {
+	mock.Mock
+}
+
+func newMockReadCloser(t *testing.T) *mockReadCloser {
+	m := &mockReadCloser{}
+	m.Test(t)
+	return m
+}
+
+func (m *mockReadCloser) Read(p []byte) (n int, err error) {
+	args := m.Called(p)
+	return args.Int(0), args.Error(1)
+}
+
+func (m *mockReadCloser) Close() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+func TestFileReader_Close(t *testing.T) {
+	t.Run("Error", func(t *testing.T) {
+		t.Run("Already Closed", func(t *testing.T) {
+			var b bytes.Buffer
+			r := NewFileReader(&b)
+			err := r.Close()
+			require.NoError(t, err)
+
+			err = r.Close()
+
+			assert.Same(t, err, ErrClosed)
+		})
+
+		t.Run("Has io.Closer Error", func(t *testing.T) {
+			m := newMockReadCloser(t)
+			r := NewFileReader(m)
+			expectedErr := errors.New("foo")
+			m.On("Close").Return(expectedErr)
+
+			err := r.Close()
+
+			assert.Same(t, err, expectedErr)
+			m.AssertExpectations(t)
+		})
+	})
+
+	t.Run("Success", func(t *testing.T) {
+		t.Run("Has io.Closer", func(t *testing.T) {
+			m := newMockReadCloser(t)
+			r := NewFileReader(m)
+			m.On("Close").Return(nil)
+
+			err := r.Close()
+
+			assert.NoError(t, err)
+			m.AssertExpectations(t)
+		})
+
+		t.Run("No io.Closer", func(t *testing.T) {
+			var b bytes.Buffer
+			r := NewFileReader(&b)
+
+			err := r.Close()
+
+			assert.NoError(t, err)
+		})
 	})
 }

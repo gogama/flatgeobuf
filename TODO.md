@@ -11,8 +11,9 @@ NEXT STEPS:
        ambiguous or assumey about whether offset is relative to data
        section start or relative to file start.
     5. Cut v0.9.5-beta.
-    6. Update copyrights to 2024. 
-    6. Cut v1.0.0.
+    6. Add GitHub action to build/test on commit? (If free.)
+    7. Update copyrights to 2024. 
+    8. Cut v1.0.0.
 
 Future directions:
 1. Another interesting interaction system would be an Appender which

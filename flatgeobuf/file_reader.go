@@ -27,7 +27,8 @@ type FileReader struct {
 	// FlatGeobuf header.
 	numFeatures int
 	// nodeSize is the index node size recorded in the FlatGeobuf
-	// header.
+	// header. Consistent with the FlatGeobuf specification, a zero
+	// value indicates no index.
 	nodeSize uint16
 	// indexOffset is the byte offset of the spatial index within the
 	// file being read by r. It will only have a non-zero value if r
@@ -145,6 +146,20 @@ func (r *FileReader) Header() (*flat.Header, error) {
 	r.numFeatures = int(numFeatures)
 	r.nodeSize = nodeSize
 
+	// If the underlying reader is seekable and the index exists, store
+	// the index offset for future rewinds. If the underlying reader is
+	// seekable and there is no index, store the data offset.
+	if s, ok := r.r.(io.Seeker); ok {
+		if err = r.saveIndexOffset(s); err != nil {
+			return nil, err
+		}
+		if nodeSize == 0 {
+			if err = r.saveDataOffset(s); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	// Transition into state for reading index.
 	_ = r.toState(beforeHeader, afterHeader, inside)
 
@@ -153,7 +168,7 @@ func (r *FileReader) Header() (*flat.Header, error) {
 }
 
 // Index reads and returns an in-memory implementation of the FlatGeobuf
-// file's index data structure. If the FlatGeobuf file nas no index, the
+// file's index data structure. If the FlatGeobuf file has no index, the
 // error ErrNoIndex is returned.
 //
 // This method may only be called immediately after a successful call to
@@ -178,39 +193,17 @@ func (r *FileReader) Index() (*packedrtree.PackedRTree, error) {
 		return nil, ErrNoIndex
 	}
 
-	// If we know our underlying reader is seekable, we may cache its
-	// io.Seeker interface.
-	var s io.Seeker
-
-	// This Index() read might be after a Rewind() after a prior Index()
-	// call read and cached the index. In this case, we can seek the
-	// read cursor forward to the data section and return the cached
-	// index.
+	// This Index() read might occur after a Rewind() call, which itself
+	// happened after a prior Index() call both read and cached the
+	// index. In this case, we can seek the read cursor forward to the
+	// data section and return the cached index.
 	if r.cachedIndex != nil {
-		s = r.r.(io.Seeker)
+		s := r.r.(io.Seeker)
 		if _, err := s.Seek(r.dataOffset, io.SeekStart); err != nil {
 			return nil, r.toErr(wrapErr("failed to seek past cached index", err))
 		}
 		_ = r.toState(beforeIndex, afterIndex, inside)
 		return r.cachedIndex, nil
-	}
-
-	// This Index() call might be after a Rewind() call. The Rewind()
-	// call just ensures we have an io.Seeker and resets our reader
-	// state to afterIndex, but, trying to be as lazy as possible, it
-	// doesn't actually seek. Do that now.
-	if r.indexOffset > 0 {
-		s = r.r.(io.Seeker)
-		if _, err := s.Seek(r.indexOffset, io.SeekStart); err != nil {
-			return nil, r.toErr(wrapErr("failed to seek to index section", err))
-		}
-	}
-
-	// Since we know that the reader's position is at the start of the
-	// index section, we save this for future reference in case the user
-	// does a Rewind().
-	if err := r.saveIndexOffset(s); err != nil {
-		return nil, err
 	}
 
 	// Read the actual index.
@@ -221,6 +214,15 @@ func (r *FileReader) Index() (*packedrtree.PackedRTree, error) {
 
 	// Cache the index for use after future Rewind().
 	r.cachedIndex = prt
+
+	// Save the data offset, if it is not already saved.
+	if r.dataOffset == 0 {
+		if s, ok := r.r.(io.Seeker); ok {
+			if err = r.saveDataOffset(s); err != nil {
+				return nil, err
+			}
+		}
+	}
 
 	// Transition into state for reading feature data.
 	_ = r.toState(beforeIndex, afterIndex, inside)
@@ -266,21 +268,21 @@ func (r *FileReader) IndexSearch(b packedrtree.Box) ([]flat.Feature, error) {
 			// it and seek past the index.
 			sr = r.cachedIndex.Search(b)
 			if _, err := rs.Seek(r.dataOffset, io.SeekStart); err != nil {
-				return nil, r.toErr(wrapErr("failed to skip past index", err))
+				return nil, r.toErr(wrapErr("failed to seek past index", err))
 			}
 		} else {
-			// If we've already saved the index offset, seek there.
-			// Otherwise, save the index position in case we need to
-			// rewind in the future.
+			// If we've already saved the index offset, which is only
+			// set if the underlying reader is seekable, seek to the
+			// index offset.
 			if r.indexOffset > 0 {
 				if _, err := rs.Seek(r.indexOffset, io.SeekStart); err != nil {
 					return nil, r.toErr(wrapErr("failed to seek to index start", err))
 				}
-			} else if err := r.saveIndexOffset(rs); err != nil {
-				return nil, err
 			}
 			// Attempt an efficient streaming search without reading
-			// the whole index into memory.
+			// the whole index into memory. If the seek search succeeds,
+			// the reader will be positioned at the first byte of the
+			// data section.
 			var err error
 			if sr, err = packedrtree.Seek(rs, r.numFeatures, r.nodeSize, b); err != nil {
 				return nil, r.toErr(wrapErr("failed to seek-search index", err))
@@ -293,11 +295,15 @@ func (r *FileReader) IndexSearch(b packedrtree.Box) ([]flat.Feature, error) {
 		}
 		sr = r.cachedIndex.Search(b)
 	} else {
+		// In this branch, we don't have a seeker; yet we also know that
+		// Index() cannot have been called because otherwise we would
+		// not be in the afterHeader state.
 		textPanic("logic error: index should not be cached")
 	}
 
 	// If the search results did not come from streaming search, sort
 	// them so their offsets are in file order.
+	// TODO: Enrich comment by explaining why we do this.
 	if r.cachedIndex != nil {
 		sort.Sort(sr)
 	}
@@ -305,8 +311,10 @@ func (r *FileReader) IndexSearch(b packedrtree.Box) ([]flat.Feature, error) {
 	// The reader's read cursor is now past the index and at the
 	// start of the data section.
 	_ = r.toState(beforeIndex, afterIndex, inside)
-	if err := r.saveDataOffset(rs); err != nil {
-		return nil, err
+	if r.dataOffset == 0 {
+		if err := r.saveDataOffset(rs); err != nil {
+			return nil, err
+		}
 	}
 	_ = r.toState(afterIndex, inData, inside)
 
@@ -381,9 +389,6 @@ func (r *FileReader) Data(p []flat.Feature) (int, error) {
 	}
 
 	if r.state == afterIndex {
-		if err := r.saveDataOffset(nil); err != nil {
-			return 0, err
-		}
 		r.state = inData
 	}
 
@@ -475,19 +480,18 @@ func (r *FileReader) DataRem() ([]flat.Feature, error) {
 func (r *FileReader) Rewind() error {
 	if r.err != nil {
 		return r.err
+	} else if r.state < afterHeader {
+		return textErr(errHeaderNotCalled)
+	} else if r.indexOffset == 0 {
+		return ErrNotSeekable
 	} else if r.state == afterHeader {
 		return nil // No-Op
 	}
 
-	if r.state < afterHeader {
-		return textErr(errHeaderNotCalled)
-	} else if r.indexOffset == 0 {
-		return ErrNotSeekable
+	s := r.r.(io.Seeker)
+	if _, err := s.Seek(r.indexOffset, io.SeekStart); err != nil {
+		return r.toErr(wrapErr("failed to seek to end of header", err))
 	}
-
-	// Reset state to just after reading the header, but lazily do not
-	// seek. Actual seeking will be done by either Index() or one of the
-	// Data family of methods, as appropriate.
 	r.state = afterHeader
 	r.featureIndex = 0
 	r.featureOffset = 0
@@ -524,36 +528,32 @@ func (r *FileReader) skipIndex() error {
 	_ = r.toState(afterHeader, beforeIndex, inside)
 
 	// Seek or read to the correct position.
-	if r.nodeSize > 0 {
-		if r.dataOffset > 0 { // If we already know the data offset, seek to it.
-			s := r.r.(io.Seeker)
-			if _, err := s.Seek(r.dataOffset, io.SeekStart); err != nil {
-				return r.toErr(err)
-			}
-		} else if s, ok := r.r.(io.Seeker); ok { // If we can seek past the index, do so.
-			if err := r.saveIndexOffset(s); err != nil {
-				return err
-			}
-			indexSize, err := packedrtree.Size(r.numFeatures, r.nodeSize)
-			if err != nil {
-				return r.toErr(err)
-			}
-			r.dataOffset = r.indexOffset + int64(indexSize)
-			if _, err = s.Seek(r.dataOffset, io.SeekStart); err != nil {
-				return r.toErr(err)
-			}
-		} else { // Our only choice is to read past the index.
-			indexSize, err := packedrtree.Size(r.numFeatures, r.nodeSize)
-			if err != nil {
-				return r.toErr(err)
-			}
-			bufSize := discardBufferSize
-			if indexSize < bufSize {
-				bufSize = indexSize
-			}
-			if err = discard(r.r, make([]byte, bufSize), int64(indexSize)); err != nil {
-				return r.toErr(err)
-			}
+	if r.dataOffset > 0 { // If we already know the data offset, seek to it.
+		s := r.r.(io.Seeker)
+		if _, err := s.Seek(r.dataOffset, io.SeekStart); err != nil {
+			return r.toErr(err)
+		}
+	} else if r.indexOffset > 0 { // If we can seek past the index, do so.
+		indexSize, err := packedrtree.Size(r.numFeatures, r.nodeSize)
+		if err != nil {
+			return r.toErr(err)
+		}
+		r.dataOffset = r.indexOffset + int64(indexSize)
+		s := r.r.(io.Seeker)
+		if _, err = s.Seek(r.dataOffset, io.SeekStart); err != nil {
+			return r.toErr(err)
+		}
+	} else { // Our only choice is to read past the index.
+		indexSize, err := packedrtree.Size(r.numFeatures, r.nodeSize)
+		if err != nil {
+			return r.toErr(err)
+		}
+		bufSize := discardBufferSize
+		if indexSize < bufSize {
+			bufSize = indexSize
+		}
+		if err = discard(r.r, make([]byte, bufSize), int64(indexSize)); err != nil {
+			return r.toErr(err)
 		}
 	}
 
