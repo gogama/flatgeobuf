@@ -290,6 +290,11 @@ func (mh *mockHeader) buildAsBytes() []byte {
 	return bldr.FinishedBytes()
 }
 
+func (mh *mockHeader) buildAsTable() *flat.Header {
+	b := mh.buildAsBytes()
+	return flat.GetSizePrefixedRootAsHeader(b, 0)
+}
+
 type mockGeometry struct {
 	ends         []uint32
 	xy           []float64

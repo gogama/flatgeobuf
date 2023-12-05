@@ -38,8 +38,8 @@ func writeSizePrefixedTable(w io.Writer, t flatbuffers.Table) (n int, err error)
 	var size uint32
 	if size, err = tableSize(t); err != nil {
 		return
-	} else if uint64(size) > uint64(len(t.Bytes)) {
-		err = fmtErr("FlatBuffers table buffer is smaller than the size prefix (Len=%d, size=%d)", len(t.Bytes), size)
+	} else if uint64(len(t.Bytes)) < uint64(size)+flatbuffers.SizeUint32 {
+		err = fmtErr("FlatBuffers table buffer is smaller than the size prefix (size=%d, len=%d, gap=%d)", size, len(t.Bytes), uint64(size)+flatbuffers.SizeUint32-uint64(len(t.Bytes)))
 		return
 	} else {
 		n, err = w.Write(t.Bytes[0 : flatbuffers.SizeUint32+size])
@@ -47,14 +47,10 @@ func writeSizePrefixedTable(w io.Writer, t flatbuffers.Table) (n int, err error)
 	}
 }
 
-// FIXME: Per discussion with Juan, this function doesn't do what it thinks it's doing.
-//
-// Open questions: (1) Is it even possible to police wither a table is
-// size-prefixed? (2) More fundamentally, can you always say that the
-// first four bytes are the size?
 func tableSize(t flatbuffers.Table) (size uint32, err error) {
-	if t.Pos != flatbuffers.SizeUint32 {
-		err = fmtErr("not a size-prefixed root FlatBuffers table at offset 0 (Len=%d, Pos=%d)", len(t.Bytes), t.Pos)
+	if len(t.Bytes) < flatbuffers.SizeUint32 {
+		err = fmtErr("FlatBuffers table buffer is too small for a size prefix (required=%d, len=%d)", flatbuffers.SizeUint32, len(t.Bytes))
+		return
 	}
 	size = flatbuffers.GetUint32(t.Bytes)
 	return
