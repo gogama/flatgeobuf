@@ -6,17 +6,10 @@ NEXT STEPS:
         (a) replace all interface{} with any.
         (b) consider using a generics-based heap which is faster? Or
             maybe do that another day.
-    4. Clear up all CODE and DOCUMENTATION references to Ref.Offset and
-       validate that it works as expected. I think the code and docs are
-       ambiguous or assumey about whether offset is relative to data
-       section start or relative to file start.
-            packedrtree.Refs is very clear that it is "offset into the
-            data section". That's also how the IndexSearch code works.
-            It's a non-issue.
-    5. Cut v0.9.5-beta.
-    6. Add GitHub action to build/test on commit? (If free.)
-    7. Update copyrights to 2024. 
-    8. Cut v1.0.0.
+    4. Cut v0.9.5-beta.
+    5. Add GitHub action to build/test on commit? (If free.)
+    6. Update copyrights to 2024. 
+    7. Cut v1.0.0.
 
 Future directions:
 1. Another interesting interaction system would be an Appender which
