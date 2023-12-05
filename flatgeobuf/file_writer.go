@@ -6,7 +6,6 @@ package flatgeobuf
 
 import (
 	"io"
-	"math"
 
 	"github.com/gogama/flatgeobuf/flatgeobuf/flat"
 	"github.com/gogama/flatgeobuf/packedrtree"
@@ -19,13 +18,13 @@ type FileWriter struct {
 	w io.Writer
 	// numFeatures is the number of features recorded in the FlatGeobuf
 	// header.
-	numFeatures int
+	numFeatures uint64
 	// nodeSize is the index node size recorded in the FlatGeobuf
 	// header.
 	nodeSize uint16
 	// featureIndex is the index of the next feature to write, a number
 	// in the range [0, numFeatures]
-	featureIndex int
+	featureIndex uint64
 }
 
 // NewFileWriter creates a new FlatGeobuf file writer based on an
@@ -64,10 +63,6 @@ func (w *FileWriter) Header(hdr *flat.Header) (n int, err error) {
 	})
 	if err != nil {
 		err = wrapErr("failed to get header feature count", err)
-		return
-	}
-	if numFeatures > math.MaxInt {
-		err = wrapErr("header feature count overflows int", err)
 		return
 	}
 
@@ -114,7 +109,7 @@ func (w *FileWriter) Header(hdr *flat.Header) (n int, err error) {
 	}
 
 	// Save cached feature count and index node size.
-	w.numFeatures = int(numFeatures)
+	w.numFeatures = numFeatures
 	w.nodeSize = nodeSize
 
 	// Transition into the state for writing index.
@@ -145,7 +140,7 @@ func (w *FileWriter) index(index *packedrtree.PackedRTree) (n int, err error) {
 	w.state = beforeIndex
 
 	// Ensure index parameters agree with header parameters.
-	if w.numFeatures != index.NumRefs() {
+	if w.numFeatures != uint64(index.NumRefs()) {
 		err = fmtErr("feature count mismatch (header=%d, index=%d)", w.numFeatures, index.NumRefs())
 		w.state = afterHeader // Go back to header state.
 		return
@@ -254,7 +249,7 @@ func (w *FileWriter) IndexData(p []flat.Feature) (n int, err error) {
 // FileReader.DataRem, and from flat.GetSizePrefixedRootAsFeature.
 func (w *FileWriter) Data(p []flat.Feature) (n int, err error) {
 	// Ensure we can fit all the requested features.
-	if err = w.canWriteData(len(p)); err != nil {
+	if err = w.canWriteData(uint64(len(p))); err != nil {
 		return
 	}
 
@@ -319,7 +314,7 @@ func (w *FileWriter) canWriteIndex() error {
 	return nil
 }
 
-func (w *FileWriter) canWriteData(n int) error {
+func (w *FileWriter) canWriteData(n uint64) error {
 	if w.err != nil {
 		return w.err
 	}

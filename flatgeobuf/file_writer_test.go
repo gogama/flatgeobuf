@@ -9,9 +9,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,7 +25,19 @@ func TestNewFileWriter(t *testing.T) {
 }
 
 func TestFileWriter_Header(t *testing.T) {
+	t.Run("Error", func(t *testing.T) {
+		t.Run("Header Already Called", func(t *testing.T) {
+			// TODO
+		})
 
+		t.Run("Nil Header", func(t *testing.T) {
+			// TODO
+		})
+
+		t.Run("Corrupt Header: Failed to Get Feature Count", func(t *testing.T) {
+			// TODO
+		})
+	})
 }
 
 func TestFileWriter_Index(t *testing.T) {
