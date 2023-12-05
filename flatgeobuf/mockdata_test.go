@@ -11,11 +11,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/gogama/flatgeobuf/flatgeobuf/flat"
 	"github.com/gogama/flatgeobuf/packedrtree"
 	flatbuffers "github.com/google/flatbuffers/go"
+	"github.com/stretchr/testify/require"
 )
 
 type mockColumn struct {

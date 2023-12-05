@@ -13,15 +13,11 @@ import (
 	"strconv"
 	"testing"
 
-	flatbuffers "github.com/google/flatbuffers/go"
-
-	"github.com/stretchr/testify/mock"
-
-	"github.com/gogama/flatgeobuf/packedrtree"
-
 	"github.com/gogama/flatgeobuf/flatgeobuf/flat"
-
+	"github.com/gogama/flatgeobuf/packedrtree"
+	flatbuffers "github.com/google/flatbuffers/go"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
