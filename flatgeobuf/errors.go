@@ -31,6 +31,9 @@ const (
 	errIndexNotWritten     = "header requires index but no index written"
 	errReadPastIndex       = "read position is past index"
 	errWritePastIndex      = "write position is past index"
+	errSeekingData         = "failed to seek to data section"
+	errIndexSize           = "failed to calculate index size"
+	errDiscardIndex        = "failed to read past index"
 )
 
 const packageName = "flatgeobuf: "

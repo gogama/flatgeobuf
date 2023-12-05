@@ -10,6 +10,9 @@ NEXT STEPS:
        validate that it works as expected. I think the code and docs are
        ambiguous or assumey about whether offset is relative to data
        section start or relative to file start.
+            packedrtree.Refs is very clear that it is "offset into the
+            data section". That's also how the IndexSearch code works.
+            It's a non-issue.
     5. Cut v0.9.5-beta.
     6. Add GitHub action to build/test on commit? (If free.)
     7. Update copyrights to 2024. 
@@ -25,4 +28,5 @@ This would address the "append without index" use case suggested on the FlatGeob
 docs site.
 2. Add an orb compatibility package for feature conversion? The orb
    dependency would be ring-fenced to this sub-package so that other
-   consumers don't need orb.
+   consumers don't need orb. An alternative is just to create another
+   repository, flatgeobuf-orb, for this extended functionality.

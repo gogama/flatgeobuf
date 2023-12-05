@@ -68,11 +68,20 @@ func NewFileReader(r io.Reader) *FileReader {
 }
 
 // Header reads and returns the FlatBuffer table containing the
-// FlatGeobuf file's header structure.
+// FlatGeobuf file's header table.
 //
 // This method may only be called once, immediately after creating the
 // FileReader via NewFileReader. Once the reader has advanced past the
 // header, it cannot be read again.
+//
+// If the header table cannot be read, the return value is a nil pointer
+// and an error. If the header table was successfully read and contains
+// usable values, the return value is  a non-nil pointer and a nil
+// error. Lastly, if the header table was successfully read, but the
+// feature count or index node size values it contains are unusable, the
+// return value is a non-nil pointer and an error, in which case this
+// reader will transition to a permanent error state from which only the
+// Close() method will work without further error.
 func (r *FileReader) Header() (*flat.Header, error) {
 	// Transition into state for reading magic number.
 	if err := r.toState(uninitialized, beforeMagic, outside); err == errUnexpectedState {
@@ -153,7 +162,7 @@ func (r *FileReader) Header() (*flat.Header, error) {
 		if err = r.saveIndexOffset(s); err != nil {
 			return nil, err
 		}
-		if nodeSize == 0 {
+		if nodeSize == 0 || numFeatures == 0 {
 			if err = r.saveDataOffset(s); err != nil {
 				return nil, err
 			}
@@ -187,8 +196,10 @@ func (r *FileReader) Index() (*packedrtree.PackedRTree, error) {
 	}
 
 	// If the node size is zero, there is no index and the reader is
-	// already pointing at the data section.
-	if r.nodeSize == 0 {
+	// already pointing at the data section. If the feature count is
+	// zero, the number of features is unknown and there can't be an
+	// index.
+	if r.nodeSize == 0 || r.numFeatures == 0 {
 		_ = r.toState(beforeIndex, afterIndex, inside)
 		return nil, ErrNoIndex
 	}
@@ -206,6 +217,20 @@ func (r *FileReader) Index() (*packedrtree.PackedRTree, error) {
 		return r.cachedIndex, nil
 	}
 
+	// Read and cache the index.
+	prt, err := r.index()
+	if err != nil {
+		return nil, err
+	}
+
+	// Transition into state for reading feature data.
+	_ = r.toState(beforeIndex, afterIndex, inside)
+
+	// Return the index.
+	return prt, nil
+}
+
+func (r *FileReader) index() (*packedrtree.PackedRTree, error) {
 	// Read the actual index.
 	prt, err := packedrtree.Unmarshal(r.r, r.numFeatures, r.nodeSize)
 	if err != nil {
@@ -224,10 +249,7 @@ func (r *FileReader) Index() (*packedrtree.PackedRTree, error) {
 		}
 	}
 
-	// Transition into state for reading feature data.
-	_ = r.toState(beforeIndex, afterIndex, inside)
-
-	// Return the index.
+	// Return the index
 	return prt, nil
 }
 
@@ -254,7 +276,7 @@ func (r *FileReader) IndexSearch(b packedrtree.Box) ([]flat.Feature, error) {
 		return nil, r.indexStateErr(r.state)
 	} else if err != nil {
 		return nil, err
-	} else if r.nodeSize == 0 {
+	} else if r.nodeSize == 0 || r.numFeatures == 0 {
 		r.state = afterIndex
 		return nil, ErrNoIndex
 	}
@@ -279,10 +301,10 @@ func (r *FileReader) IndexSearch(b packedrtree.Box) ([]flat.Feature, error) {
 					return nil, r.toErr(wrapErr("failed to seek to index start", err))
 				}
 			}
-			// Attempt an efficient streaming search without reading
-			// the whole index into memory. If the seek search succeeds,
-			// the reader will be positioned at the first byte of the
-			// data section.
+			// Attempt an efficient streaming search without reading the
+			// whole index into memory. If the seek search succeeds, the
+			// reader will be positioned at the first byte of the data
+			// section.
 			var err error
 			if sr, err = packedrtree.Seek(rs, r.numFeatures, r.nodeSize, b); err != nil {
 				return nil, r.toErr(wrapErr("failed to seek-search index", err))
@@ -290,7 +312,7 @@ func (r *FileReader) IndexSearch(b packedrtree.Box) ([]flat.Feature, error) {
 		}
 	} else if r.cachedIndex == nil {
 		// Force caching the index.
-		if _, err := r.Index(); err != nil {
+		if _, err := r.index(); err != nil {
 			return nil, err
 		}
 		sr = r.cachedIndex.Search(b)
@@ -302,8 +324,10 @@ func (r *FileReader) IndexSearch(b packedrtree.Box) ([]flat.Feature, error) {
 	}
 
 	// If the search results did not come from streaming search, sort
-	// them so their offsets are in file order.
-	// TODO: Enrich comment by explaining why we do this.
+	// them so their offsets are in file order. This is needed because
+	// for the cached index search, the order of search results is not
+	// defined, but for the streaming search, results are provided in
+	// ascending order of offset.
 	if r.cachedIndex != nil {
 		sort.Sort(sr)
 	}
@@ -413,9 +437,12 @@ func (r *FileReader) Data(p []flat.Feature) (int, error) {
 
 	for i := 0; i < n; i++ {
 		err := r.readFeature(&p[i])
-		if r.numFeatures == 0 && err == errEndOfData {
+		if err == errEndOfData && i == 0 {
 			_ = r.toState(inData, eof, inside)
-			return i, io.EOF
+			return 0, io.EOF
+		} else if err == errEndOfData {
+			_ = r.toState(inData, eof, inside)
+			return i, nil
 		} else if err != nil {
 			return i, err
 		}
@@ -428,6 +455,8 @@ func (r *FileReader) Data(p []flat.Feature) (int, error) {
 	return n, nil
 }
 
+const dataRemBufferLen = 1024
+
 // DataRem reads and returns all remaining unread features from the
 // FlatGeobuf data section.
 //
@@ -437,7 +466,11 @@ func (r *FileReader) Data(p []flat.Feature) (int, error) {
 // section. Otherwise, it reads all features remaining after the last
 // Data call left off.
 func (r *FileReader) DataRem() ([]flat.Feature, error) {
-	if r.numFeatures > 0 {
+	if r.err != nil {
+		return nil, r.err
+	} else if r.state == eof {
+		return nil, io.EOF
+	} else if r.numFeatures > 0 {
 		rem := r.numFeatures - r.featureIndex
 		p := make([]flat.Feature, rem)
 		n, err := r.Data(p)
@@ -446,11 +479,11 @@ func (r *FileReader) DataRem() ([]flat.Feature, error) {
 			return p, err
 		}
 		if n != rem {
-			fmtPanic("expected %d features but read %d", rem, n)
+			return p, r.toErr(wrapErr("expected to read %d features but read %d", io.ErrUnexpectedEOF, rem, n))
 		}
 		return p, nil
 	} else {
-		p := make([]flat.Feature, 1024)
+		p := make([]flat.Feature, dataRemBufferLen)
 		n, err := r.Data(p)
 		if err != nil && err != io.EOF {
 			return p[0:n], err
@@ -512,7 +545,7 @@ func (r *FileReader) indexStateErr(state state) error {
 	case uninitialized:
 		return textErr(errHeaderNotCalled)
 	case afterIndex, inData, eof:
-		if r.featureIndex > 0 {
+		if r.indexOffset > 0 {
 			return textErr(errReadPastIndex + " (reader is an io.Seeker though, try Rewind)")
 		} else {
 			return textErr(errReadPastIndex)
@@ -531,29 +564,29 @@ func (r *FileReader) skipIndex() error {
 	if r.dataOffset > 0 { // If we already know the data offset, seek to it.
 		s := r.r.(io.Seeker)
 		if _, err := s.Seek(r.dataOffset, io.SeekStart); err != nil {
-			return r.toErr(err)
+			return r.toErr(wrapErr(errSeekingData, err))
 		}
 	} else if r.indexOffset > 0 { // If we can seek past the index, do so.
 		indexSize, err := packedrtree.Size(r.numFeatures, r.nodeSize)
 		if err != nil {
-			return r.toErr(err)
+			return r.toErr(wrapErr(errIndexSize, err))
 		}
 		r.dataOffset = r.indexOffset + int64(indexSize)
 		s := r.r.(io.Seeker)
 		if _, err = s.Seek(r.dataOffset, io.SeekStart); err != nil {
-			return r.toErr(err)
+			return r.toErr(wrapErr(errSeekingData, err))
 		}
-	} else { // Our only choice is to read past the index.
+	} else if r.nodeSize > 0 && r.numFeatures > 0 { // Our only choice is to read past the index.
 		indexSize, err := packedrtree.Size(r.numFeatures, r.nodeSize)
 		if err != nil {
-			return r.toErr(err)
+			return r.toErr(wrapErr(errIndexSize, err))
 		}
 		bufSize := discardBufferSize
 		if indexSize < bufSize {
 			bufSize = indexSize
 		}
 		if err = discard(r.r, make([]byte, bufSize), int64(indexSize)); err != nil {
-			return r.toErr(err)
+			return r.toErr(wrapErr(errDiscardIndex, err))
 		}
 	}
 
@@ -606,7 +639,7 @@ func (r *FileReader) readFeature(f *flat.Feature) (err error) {
 	tbl := make([]byte, flatbuffers.SizeUint32+featureLen)
 	copy(tbl, b)
 	if _, err = io.ReadFull(r.r, tbl[flatbuffers.SizeUint32:]); err != nil {
-		return r.toErr(wrapErr("failed to read feature[%d] (offset %d, len=%d)", err, r.featureIndex, r.featureOffset, featureLen))
+		return r.toErr(wrapErr("failed to read feature[%d] (offset=%d, len=%d)", err, r.featureIndex, r.featureOffset, featureLen))
 	}
 
 	// Read the uoffset_t that prefixes the tables bytes and tells us

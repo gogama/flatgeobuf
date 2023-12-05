@@ -49,7 +49,7 @@ func testDataFileNames(t *testing.T) []string {
 	return testDataFileNamesSlice
 }
 
-func testDataBytesReader(t *testing.T, seeker bool, filename string) io.Reader {
+func newTestDataBytesReader(t *testing.T, seeker bool, filename string) io.Reader {
 	b := testDataByteMap[filename]
 	if b == nil {
 		f, err := os.Open(testDataRoot + filename)
@@ -69,17 +69,32 @@ func testDataBytesReader(t *testing.T, seeker bool, filename string) io.Reader {
 	}
 }
 
-func testDataFileReader(t *testing.T, seeker bool, filename string) *FileReader {
-	return NewFileReader(testDataBytesReader(t, seeker, filename))
+func newTestDataFileReader(t *testing.T, seeker bool, filename string) *FileReader {
+	return NewFileReader(newTestDataBytesReader(t, seeker, filename))
 }
 
-func testDataRunTests(t *testing.T, f func(t *testing.T, r *FileReader), seeker, skipUnsupported bool, filenames ...string) {
+type runTestsFlag int
+
+const (
+	seekable           = 0x01
+	notSeekable        = 0x02
+	skipNoIndex        = 0x04
+	includeUnsupported = 0x08
+)
+
+func testDataRunTests(t *testing.T, f func(t *testing.T, r *FileReader, filename string), flags runTestsFlag, filenames ...string) {
+	wantSeekable := flags&seekable == seekable
+	wantNotSeekable := flags&notSeekable == notSeekable
+	if !wantSeekable && !wantNotSeekable {
+		t.Error("at least one of seekable and notSeekable flags is required")
+		t.FailNow()
+	}
 	if len(filenames) == 0 {
 		filenames = testDataFileNames(t)
 	}
 	for i := range filenames {
-		if skipUnsupported {
-			r := testDataBytesReader(t, false, filenames[i])
+		if flags&includeUnsupported != includeUnsupported {
+			r := newTestDataBytesReader(t, false, filenames[i])
 			version, err := Magic(r)
 			require.NoError(t, err, "failed to read magic number for testdata file %q", filenames[i])
 			if version.Major != 3 {
@@ -87,9 +102,36 @@ func testDataRunTests(t *testing.T, f func(t *testing.T, r *FileReader), seeker,
 				continue
 			}
 		}
-		r := testDataFileReader(t, seeker, filenames[i])
+		if flags&skipNoIndex == skipNoIndex {
+			r := newTestDataFileReader(t, false, filenames[i])
+			hdr, err := r.Header()
+			require.NoError(t, err, "failed to read header for testdata file %q", filenames[i])
+			if hdr.IndexNodeSize() == 0 {
+				t.Logf("Skipping testdata file %q with because it has no index", filenames[i])
+				continue
+			}
+		}
 		t.Run(filenames[i], func(t *testing.T) {
-			f(t, r)
+			if wantSeekable {
+				r := newTestDataFileReader(t, true, filenames[i])
+				if wantNotSeekable {
+					t.Run("Seekable", func(t *testing.T) {
+						f(t, r, filenames[i])
+					})
+				} else {
+					f(t, r, filenames[i])
+				}
+			}
+			if wantNotSeekable {
+				r := newTestDataFileReader(t, false, filenames[i])
+				if wantSeekable {
+					t.Run("Not Seekable", func(t *testing.T) {
+						f(t, r, filenames[i])
+					})
+				} else {
+					f(t, r, filenames[i])
+				}
+			}
 		})
 	}
 }

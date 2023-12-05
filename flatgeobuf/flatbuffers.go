@@ -47,6 +47,11 @@ func writeSizePrefixedTable(w io.Writer, t flatbuffers.Table) (n int, err error)
 	}
 }
 
+// FIXME: Per discussion with Juan, this function doesn't do what it thinks it's doing.
+//
+// Open questions: (1) Is it even possible to police wither a table is
+// size-prefixed? (2) More fundamentally, can you always say that the
+// first four bytes are the size?
 func tableSize(t flatbuffers.Table) (size uint32, err error) {
 	if t.Pos != flatbuffers.SizeUint32 {
 		err = fmtErr("not a size-prefixed root FlatBuffers table at offset 0 (Len=%d, Pos=%d)", len(t.Bytes), t.Pos)
