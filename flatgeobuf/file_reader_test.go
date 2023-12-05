@@ -1217,7 +1217,7 @@ func TestFileReader_DataRem(t *testing.T) {
 						header: &mockHeader{
 							indexNodeSize: uint16Ptr(0),
 						},
-						data: make([]mockFeature, dataRemBufferLen+1),
+						data: make([]mockFeature, dataRemBufferSize+1),
 					}
 					for i := range mf.data {
 						mf.data[i] = mockFeature{
@@ -1229,7 +1229,7 @@ func TestFileReader_DataRem(t *testing.T) {
 					}
 					mf.init(t)
 					expectedErr := errors.New("a stealthy problem lying in wait")
-					readErr := mockDataReadError{mf.dataOffsets[dataRemBufferLen] + 13, expectedErr}
+					readErr := mockDataReadError{mf.dataOffsets[dataRemBufferSize] + 13, expectedErr}
 					for _, seeker := range []bool{false, true} {
 						t.Run(fmt.Sprintf("Seekable: %t", seeker), func(t *testing.T) {
 							var r *FileReader
@@ -1250,7 +1250,7 @@ func TestFileReader_DataRem(t *testing.T) {
 							err2 := r.Rewind()
 
 							assert.NotNil(t, p)
-							assert.Len(t, p, dataRemBufferLen)
+							assert.Len(t, p, dataRemBufferSize)
 							assert.EqualError(t, err1, "flatgeobuf: failed to read feature[1024] (offset=131072, len=124): a stealthy problem lying in wait")
 							assert.ErrorIs(t, err1, expectedErr)
 							assert.Same(t, err1, err2)

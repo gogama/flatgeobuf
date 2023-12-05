@@ -455,7 +455,9 @@ func (r *FileReader) Data(p []flat.Feature) (int, error) {
 	return n, nil
 }
 
-const dataRemBufferLen = 1024
+// dataRemBufferSize is the suggested buffer size to use when reading
+// an unknown number of features using the DataRem function.
+const dataRemBufferSize = 1024
 
 // DataRem reads and returns all remaining unread features from the
 // FlatGeobuf data section.
@@ -483,7 +485,7 @@ func (r *FileReader) DataRem() ([]flat.Feature, error) {
 		}
 		return p, nil
 	} else {
-		p := make([]flat.Feature, dataRemBufferLen)
+		p := make([]flat.Feature, dataRemBufferSize)
 		n, err := r.Data(p)
 		if err != nil && err != io.EOF {
 			return p[0:n], err
