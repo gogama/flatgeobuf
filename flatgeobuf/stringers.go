@@ -34,7 +34,7 @@ func HeaderString(hdr *flat.Header) string {
 		if nodeSize > 0 {
 			stringUint64(&b, ",NodeSize", uint64(nodeSize))
 		} else {
-			fmt.Fprint(&b, ",NO INDEX")
+			_, _ = fmt.Fprint(&b, ",NO INDEX")
 		}
 		var crs flat.Crs
 		stringKey(&b, ",CRS")
@@ -48,7 +48,7 @@ func HeaderString(hdr *flat.Header) string {
 			if wkt == nil {
 				b.WriteString("<nil>")
 			} else {
-				fmt.Fprintf(&b, "%d bytes", len(wkt))
+				_, _ = fmt.Fprintf(&b, "%d bytes", len(wkt))
 			}
 			stringBytes(&b, ",CodeString", crs.CodeString())
 			b.WriteByte('}')
@@ -85,11 +85,11 @@ func stringStr(b *strings.Builder, key string, value string) {
 
 func stringInt64(b *strings.Builder, key string, value int64) {
 	stringKey(b, key)
-	fmt.Fprintf(b, "%d", value)
+	_, _ = fmt.Fprintf(b, "%d", value)
 }
 func stringUint64(b *strings.Builder, key string, value uint64) {
 	stringKey(b, key)
-	fmt.Fprintf(b, "%d", value)
+	_, _ = fmt.Fprintf(b, "%d", value)
 }
 
 func stringEnvelope(b *strings.Builder, hdr *flat.Header) {
@@ -97,9 +97,9 @@ func stringEnvelope(b *strings.Builder, hdr *flat.Header) {
 	if n > 0 {
 		stringKey(b, ",Envelope")
 		b.WriteByte('[')
-		fmt.Fprintf(b, "%.8g", hdr.Envelope(0))
+		_, _ = fmt.Fprintf(b, "%.8g", hdr.Envelope(0))
 		for i := 1; i < n; i++ {
-			fmt.Fprintf(b, ",%.8g", hdr.Envelope(i))
+			_, _ = fmt.Fprintf(b, ",%.8g", hdr.Envelope(i))
 		}
 		b.WriteByte(']')
 	}
