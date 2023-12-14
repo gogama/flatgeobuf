@@ -9,7 +9,8 @@ NEXT STEPS:
     4. Cut v0.9.5-beta.
     5. Add GitHub action to build/test on commit? (If free.)
     6. Update copyrights to 2024. 
-    7. Cut v1.0.0.
+    7. Clear out any remaining TODO, for e.g. example_test.go. 
+    8. Cut v1.0.0.
 
 Future directions:
 1. Another interesting interaction system would be an Appender which

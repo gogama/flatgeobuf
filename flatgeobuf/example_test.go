@@ -6,9 +6,10 @@ package flatgeobuf_test
 
 import (
 	"bytes"
+	"embed"
 	"encoding/hex"
 	"fmt"
-	"os"
+	"io/fs"
 	"sort"
 
 	"github.com/gogama/flatgeobuf/flatgeobuf"
@@ -17,8 +18,11 @@ import (
 	flatbuffers "github.com/google/flatbuffers/go"
 )
 
-func openFile(name string) *os.File {
-	f, err := os.Open(name)
+//go:embed testdata/flatgeobuf/*.fgb
+var testFiles embed.FS
+
+func openFile(name string) fs.File {
+	f, err := testFiles.Open(name)
 	if err != nil {
 		panic(err)
 	}
