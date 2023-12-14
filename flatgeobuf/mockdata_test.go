@@ -74,15 +74,9 @@ func (mc *mockColumn) build(bldr *flatbuffers.Builder) flatbuffers.UOffsetT {
 		if mc.scale != 0 {
 			defer flat.ColumnAddScale(bldr, mc.scale)
 		}
-		if mc.nullable {
-			defer flat.ColumnAddNullable(bldr, true)
-		}
-		if mc.unique {
-			defer flat.ColumnAddUnique(bldr, true)
-		}
-		if mc.primaryKey {
-			defer flat.ColumnAddPrimaryKey(bldr, true)
-		}
+		defer flat.ColumnAddNullable(bldr, mc.nullable)
+		defer flat.ColumnAddUnique(bldr, mc.unique)
+		defer flat.ColumnAddPrimaryKey(bldr, mc.primaryKey)
 		if mc.metadata != nil {
 			offset = bldr.CreateString(*mc.metadata)
 			defer flat.ColumnAddMetadata(bldr, offset)
@@ -306,6 +300,25 @@ type mockGeometry struct {
 	parts        []mockGeometry
 }
 
+func mockGeometryFromFlatBufferTable(g *flat.Geometry) (mg mockGeometry) {
+	mg.ends = sliceFromFlatBufferTable(g.EndsLength(), g.Ends)
+	mg.xy = sliceFromFlatBufferTable(g.XyLength(), g.Xy)
+	mg.z = sliceFromFlatBufferTable(g.ZLength(), g.Z)
+	mg.m = sliceFromFlatBufferTable(g.MLength(), g.M)
+	mg.t = sliceFromFlatBufferTable(g.TLength(), g.T)
+	mg.tm = sliceFromFlatBufferTable(g.TmLength(), g.Tm)
+	mg.geometryType = g.Type()
+	if n := g.PartsLength(); n > 0 {
+		mg.parts = make([]mockGeometry, n)
+		for i := range mg.parts {
+			var h flat.Geometry
+			g.Parts(&h, i)
+			mg.parts[i] = mockGeometryFromFlatBufferTable(&h)
+		}
+	}
+	return
+}
+
 func (mg *mockGeometry) build(bldr *flatbuffers.Builder) flatbuffers.UOffsetT {
 	func() {
 		if len(mg.ends) > 0 {
@@ -360,6 +373,33 @@ type mockFeature struct {
 	columns    []mockColumn
 }
 
+func mockFeatureFromFlatBufferTable(f *flat.Feature) (mf mockFeature) {
+	if g := f.Geometry(nil); g != nil {
+		mg := mockGeometryFromFlatBufferTable(g)
+		mf.geometry = &mg
+	}
+	mf.properties = f.PropertiesBytes()
+	if n := f.ColumnsLength(); n > 0 {
+		mf.columns = make([]mockColumn, n)
+		for i := range mf.columns {
+			var col flat.Column
+			f.Columns(&col, i)
+			mf.columns[i] = mockColumnFromFlatBufferTable(&col)
+		}
+	}
+	return
+}
+
+func mockFeaturesFromFlatBufferTable(f []flat.Feature) (mf []mockFeature) {
+	if f != nil {
+		mf = make([]mockFeature, len(f))
+		for i := range mf {
+			mf[i] = mockFeatureFromFlatBufferTable(&f[i])
+		}
+	}
+	return
+}
+
 func (mf *mockFeature) build(bldr *flatbuffers.Builder) flatbuffers.UOffsetT {
 	func() {
 		if mf.geometry != nil {
@@ -370,7 +410,7 @@ func (mf *mockFeature) build(bldr *flatbuffers.Builder) flatbuffers.UOffsetT {
 			offset := bldr.CreateByteVector(mf.properties)
 			defer flat.FeatureAddProperties(bldr, offset)
 		}
-		if len(mf.columns) < 0 {
+		if len(mf.columns) > 0 {
 			offset := buildMockColumns(bldr, mf.columns, flat.FeatureStartColumnsVector)
 			defer flat.FeatureAddColumns(bldr, offset)
 		}
@@ -384,6 +424,11 @@ func (mf *mockFeature) buildAsBytes() []byte {
 	hdr := mf.build(bldr)
 	flat.FinishSizePrefixedFeatureBuffer(bldr, hdr)
 	return bldr.FinishedBytes()
+}
+
+func (mf *mockFeature) buildAsTable() *flat.Feature {
+	b := mf.buildAsBytes()
+	return flat.GetSizePrefixedRootAsFeature(b, 0)
 }
 
 type mockFile struct {
@@ -733,6 +778,16 @@ func stringPtr(s string) *string {
 
 func uint16Ptr(u uint16) *uint16 {
 	return &u
+}
+
+func sliceFromFlatBufferTable[N any](n int, f func(i int) N) (r []N) {
+	if n > 0 {
+		r = make([]N, n)
+		for i := range r {
+			r[i] = f(i)
+		}
+	}
+	return
 }
 
 func buildDoubleVector(bldr *flatbuffers.Builder, v []float64) flatbuffers.UOffsetT {

@@ -42,7 +42,7 @@ func TestFileReader_Header(t *testing.T) {
 				_, err = r.Header()
 
 				assert.EqualError(t, err, "flatgeobuf: Header() has already been called")
-			}, includeUnsupported|notSeekable, "empty.fgb")
+			}, notSeekable, "empty.fgb")
 		})
 
 		t.Run("Failed to Read Magic Number", func(t *testing.T) {

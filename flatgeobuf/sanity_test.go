@@ -11,6 +11,7 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/gogama/flatgeobuf/flatgeobuf/flat"
 	"github.com/gogama/flatgeobuf/packedrtree"
 	flatbuffers "github.com/google/flatbuffers/go"
 	"github.com/stretchr/testify/assert"
@@ -110,4 +111,97 @@ func TestSanity(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("RoundTrip", func(t *testing.T) {
+		// Sanity test that ensures that round-tripping test data files
+		// by reading their contents and writing the contents back to a
+		// second file results in the second file having the same data
+		// as the first file.
+		testDataRunTests(t, func(t *testing.T, r1 *FileReader, filename string) {
+			var b bytes.Buffer
+			var err error
+
+			var hdr1 *flat.Header
+			var index1 *packedrtree.PackedRTree
+			var data1 []flat.Feature
+
+			t.Run("Read to Write", func(t *testing.T) {
+				w := NewFileWriter(&b)
+				var n int
+
+				hdr1, err = r1.Header()
+				require.NoError(t, err)
+				require.NotNil(t, hdr1)
+				n, err = w.Header(hdr1)
+				require.NoError(t, err)
+				require.Greater(t, n, 0)
+
+				index1, err = r1.Index()
+				if err == ErrNoIndex {
+					t.Logf("testdata file %q has no index on first read", filename)
+					require.Nil(t, index1)
+				} else {
+					require.NoError(t, err)
+					require.NotNil(t, index1)
+					assert.Equal(t, hdr1.FeaturesCount(), uint64(index1.NumRefs()))
+					assert.Equal(t, hdr1.IndexNodeSize(), index1.NodeSize())
+					n, err = w.Index(index1)
+					require.NoError(t, err)
+				}
+
+				data1, err = r1.DataRem()
+				require.NoError(t, err)
+				require.NotNil(t, data1)
+				n, err = w.Data(data1)
+				require.NoError(t, err)
+
+				err = r1.Close()
+				require.NoError(t, err)
+				err = w.Close()
+				require.NoError(t, err)
+			})
+
+			var hdr2 *flat.Header
+			var index2 *packedrtree.PackedRTree
+			var data2 []flat.Feature
+
+			t.Run("Read Again", func(t *testing.T) {
+				r2 := NewFileReader(&b)
+
+				hdr2, err = r2.Header()
+				require.NoError(t, err)
+				require.NotNil(t, hdr2)
+				mh1 := mockHeaderFromFlatBufferTable(hdr1)
+				mh2 := mockHeaderFromFlatBufferTable(hdr2)
+				assert.Equal(t, mh1, mh2)
+
+				index2, err = r2.Index()
+				if err == ErrNoIndex {
+					t.Logf("testdata file %q has no index on second read", filename)
+					require.Nil(t, index2)
+				} else {
+					require.NoError(t, err)
+					require.NotNil(t, index2)
+					assert.Equal(t, hdr2.FeaturesCount(), uint64(index2.NumRefs()))
+					assert.Equal(t, hdr2.IndexNodeSize(), index2.NodeSize())
+					assert.Equal(t, serializeIndex(t, index1), serializeIndex(t, index2))
+				}
+
+				data2, err = r2.DataRem()
+				require.NoError(t, err)
+				require.NotNil(t, data2)
+				mf1 := mockFeaturesFromFlatBufferTable(data1)
+				mf2 := mockFeaturesFromFlatBufferTable(data2)
+				assert.Equal(t, mf1, mf2)
+			})
+		}, seekable|notSeekable)
+	})
+}
+
+func serializeIndex(t *testing.T, index *packedrtree.PackedRTree) []byte {
+	var b bytes.Buffer
+	n, err := index.Marshal(&b)
+	require.NoError(t, err)
+	require.Greater(t, n, 0)
+	return b.Bytes()
 }

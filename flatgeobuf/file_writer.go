@@ -129,37 +129,13 @@ func (w *FileWriter) Header(hdr *flat.Header) (n int, err error) {
 // IndexData method may be used, or the index may be skipped and Data
 // may be called directly after Header.
 func (w *FileWriter) Index(index *packedrtree.PackedRTree) (n int, err error) {
+	if index == nil {
+		textPanic("nil index")
+	}
 	if err = w.canWriteIndex(); err != nil {
 		return
 	}
 	return w.index(index)
-}
-
-func (w *FileWriter) index(index *packedrtree.PackedRTree) (n int, err error) {
-	// Transition into state for writing index.
-	w.state = beforeIndex
-
-	// Ensure index parameters agree with header parameters.
-	if w.numFeatures != uint64(index.NumRefs()) {
-		err = fmtErr("feature count mismatch (header=%d, index=%d)", w.numFeatures, index.NumRefs())
-		w.state = afterHeader // Go back to header state.
-		return
-	} else if w.nodeSize != index.NodeSize() {
-		err = fmtErr("node size mismatch (header=%d, index=%d)", w.nodeSize, index.NodeSize())
-		w.state = afterHeader // Go back to header state.
-		return
-	}
-
-	// Write the index.
-	n, err = index.Marshal(w.w)
-	if err != nil {
-		err = w.toErr(err)
-		return
-	}
-
-	// Transition into state for writing data.
-	_ = w.toState(beforeIndex, afterIndex, inside)
-	return
 }
 
 // IndexData generates and writes an index for the given feature list,
@@ -172,7 +148,7 @@ func (w *FileWriter) index(index *packedrtree.PackedRTree) (n int, err error) {
 // If used, this method must be called immediately after a successful
 // call to Header, and may only be called once. Alternatively, the Index
 // method may be used if you already have an index data structure ready
-// to serialize, or the index may be skipped and Data may be called
+// to serializeIndex, or the index may be skipped and Data may be called
 // directly after Header.
 //
 // The input features are FlatBuffer tables. Each feature must be a
@@ -314,6 +290,33 @@ func (w *FileWriter) canWriteIndex() error {
 	return nil
 }
 
+func (w *FileWriter) index(index *packedrtree.PackedRTree) (n int, err error) {
+	// Transition into state for writing index.
+	w.state = beforeIndex
+
+	// Ensure index parameters agree with header parameters.
+	if w.numFeatures != uint64(index.NumRefs()) {
+		err = fmtErr("feature count mismatch (header=%d, index=%d)", w.numFeatures, index.NumRefs())
+		w.state = afterHeader // Go back to header state.
+		return
+	} else if w.nodeSize != index.NodeSize() {
+		err = fmtErr("node size mismatch (header=%d, index=%d)", w.nodeSize, index.NodeSize())
+		w.state = afterHeader // Go back to header state.
+		return
+	}
+
+	// Write the index.
+	n, err = index.Marshal(w.w)
+	if err != nil {
+		err = w.toErr(wrapErr("failed to write index", err))
+		return
+	}
+
+	// Transition into state for writing data.
+	_ = w.toState(beforeIndex, afterIndex, inside)
+	return
+}
+
 func (w *FileWriter) canWriteData(n uint64) error {
 	if w.err != nil {
 		return w.err
@@ -332,7 +335,7 @@ func (w *FileWriter) canWriteData(n uint64) error {
 	default:
 		fmtPanic("logic error: unexpected state 0x%x looking to write data", w.state)
 	}
-	if w.numFeatures > 0 && w.numFeatures-w.featureIndex-n < 0 {
+	if w.numFeatures > 0 && w.numFeatures-w.featureIndex < n {
 		excess := n - (w.numFeatures - w.featureIndex)
 		return fmtErr("%d of %d features indicated in header already written, writing %d more would create an excess of %d", w.featureIndex, w.numFeatures, n, excess)
 	}
@@ -345,7 +348,7 @@ func featureBounds(b *packedrtree.Box, f *flat.Feature) error {
 		var g flat.Geometry
 		if f.Geometry(&g) != nil {
 			n := g.XyLength()
-			for i := 0; i < n; i += 2 {
+			for i := 0; i+1 < n; i += 2 {
 				b.ExpandXY(g.Xy(i+0), g.Xy(i+1))
 			}
 		}

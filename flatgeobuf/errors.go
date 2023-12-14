@@ -28,7 +28,7 @@ const (
 	errHeaderNotCalled     = "must call Header()"
 	errHeaderAlreadyCalled = "Header() has already been called"
 	errHeaderNodeSizeZero  = "header node size 0 indicates no index"
-	errIndexNotWritten     = "header requires index but no index written"
+	errIndexNotWritten     = "header specifies index but no index written"
 	errReadPastIndex       = "read position is past index"
 	errWritePastIndex      = "write position is past index"
 	errSeekingData         = "failed to seek to data section"

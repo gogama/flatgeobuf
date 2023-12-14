@@ -116,9 +116,11 @@ func testDataRunTests(t *testing.T, f func(t *testing.T, r *FileReader, filename
 				r := newTestDataFileReader(t, true, filenames[i])
 				if wantNotSeekable {
 					t.Run("Seekable", func(t *testing.T) {
+						t.Cleanup(func() { _ = r.Close() })
 						f(t, r, filenames[i])
 					})
 				} else {
+					t.Cleanup(func() { _ = r.Close() })
 					f(t, r, filenames[i])
 				}
 			}
@@ -126,9 +128,11 @@ func testDataRunTests(t *testing.T, f func(t *testing.T, r *FileReader, filename
 				r := newTestDataFileReader(t, false, filenames[i])
 				if wantSeekable {
 					t.Run("Not Seekable", func(t *testing.T) {
+						t.Cleanup(func() { _ = r.Close() })
 						f(t, r, filenames[i])
 					})
 				} else {
+					t.Cleanup(func() { _ = r.Close() })
 					f(t, r, filenames[i])
 				}
 			}
