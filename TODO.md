@@ -6,12 +6,17 @@ NEXT STEPS:
     3. If I'm committing to Go 1.20 due to unsafe.String, then:
         (a) replace all interface{} with any.
         (b) consider using a generics-based heap which is faster? Or
-            maybe do that another day.
+            maybe do that another day. THIS CAN WAIT FOR ANOTHER DAY.
+            LET'S DROP IT UNTIL PERFORMANCE BECOMES AN ISSUE.
     4. Cut v0.9.5-beta.
     5. Add GitHub action to build/test on commit? (If free.)
     6. Update copyrights to 2024. 
-    7. Clear out any remaining TODO, for e.g. example_test.go. 
-    8. Cut v1.0.0.
+    7. Clear out any remaining TODO, for e.g. example_test.go.
+    8. Finish README.md items:
+        (a) Project Status. 
+        (b) Getting started
+        (c) Compatibility
+    9. Cut v1.0.0.
 
 Future directions:
 1. Another interesting interaction system would be an Appender which
