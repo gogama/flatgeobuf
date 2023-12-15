@@ -58,7 +58,7 @@ func ExampleFileReader_emptyFile() {
 
 	data, err := r.DataRem()
 	fmt.Printf("Data = %v, err = %v\n", data, err)
-	// Output: Header{Name:gps_mobile_tiles,Type:Polygon,NumColumns:6,NumFeatures:UNKNOWN,NO INDEX,CRS:{Org:EPSG,Code:4326,Name:WGS 84,WKT:821 bytes}}
+	// Output: Header{Name:gps_mobile_tiles,Type:Polygon,Columns:6,Features:Unknown,No Index,CRS:{Org:EPSG,Code:4326,Name:WGS 84,WKT:821 bytes}}
 	// Index = <nil>, err = flatgeobuf: no index
 	// Data = [], err = <nil>
 }
@@ -83,7 +83,7 @@ func ExampleFileReader_unknownFeatureCount() {
 	if len(data) > 0 {
 		fmt.Printf("len(Data) -> %d, Data[0] -> %s\n", len(data), flatgeobuf.FeatureString(&data[0], hdr))
 	}
-	// Output: Header{Name:gps_mobile_tiles,Type:Polygon,NumColumns:6,NumFeatures:UNKNOWN,NO INDEX,CRS:{Org:EPSG,Code:4326,Name:WGS 84,WKT:821 bytes}}
+	// Output: Header{Name:gps_mobile_tiles,Type:Polygon,Columns:6,Features:Unknown,No Index,CRS:{Org:EPSG,Code:4326,Name:WGS 84,WKT:821 bytes}}
 	// len(Data) -> 1, Data[0] -> Feature{Geometry:{Type:Unknown,Bounds:[-69.911499,18.458768,-69.906006,18.463979]},Properties:{quadkey:0322113021201023,avg_d_kbps:16109,avg_u_kbps:11204,avg_lat_ms:36,tests:98,devices:49}}
 }
 
@@ -126,10 +126,10 @@ func ExampleFileReader_Index() {
 			fmt.Printf("First Result: %s\n", flatgeobuf.FeatureString(&data[results[0].RefIndex], hdr))
 		}
 	}
-	// Output: Header{Name:countries,Envelope:[-180,-85.609038,180,83.64513],Type:MultiPolygon,NumColumns:2,NumFeatures:179,NodeSize:16,CRS:{Org:EPSG,Code:4326,Name:WGS 84,WKT:354 bytes}}
+	// Output: Header{Name:countries,Envelope:[-180,-85.609038,180,83.64513],Type:MultiPolygon,Columns:2,Features:179,NodeSize:16,CRS:{Org:EPSG,Code:4326,Name:WGS 84,WKT:354 bytes}}
 	// Index -> PackedRTree{Bounds:[-180,-85.609038,180,83.64513],NumRefs:179,NodeSize:16}
 	// Results -> [{Offset:160424 RefIndex:165}]
-	// First Result: Feature{Geometry:{Type:MultiPolygon,Bounds:[-171.79111,18.91619,-66.96466,71.357764]},Properties:{id:USA,name:United States of America}}
+	// First Result: Feature{Geometry:{Type:MultiPolygon,Bounds:[-171.79111,18.91619,-66.96466,71.357764],Parts:10},Properties:{id:USA,name:United States of America}}
 }
 
 func ExampleFileReader_IndexSearch_streaming() {
@@ -172,9 +172,9 @@ func ExampleFileReader_IndexSearch_streaming() {
 		panic(fmt.Sprintf("err=  %v, len(features) = %d", err, len(data)))
 	}
 	fmt.Printf("Second search, first Result: %s\n", flatgeobuf.FeatureString(&data[0], hdr))
-	// Output: Header{Name:US__counties,Envelope:[-179.14734,17.884813,179.77847,71.352561],Type:Unknown,NumColumns:6,NumFeatures:3221,NodeSize:16,CRS:{Org:EPSG,Code:4269,Name:NAD83,WKT:1280 bytes}}
-	// First search, first Result: Feature{Geometry:{Type:MultiPolygon,Bounds:[-88.263572,41.469555,-87.524044,42.154265]},Properties:{STATE_FIPS:17,COUNTY_FIP:031,FIPS:17031,STATE:IL,NAME:Cook,LSAD:County}}
-	// Second search, first Result: Feature{Geometry:{Type:MultiPolygon,Bounds:[-113.33438,32.504938,-111.03991,34.04817]},Properties:{STATE_FIPS:04,COUNTY_FIP:013,FIPS:04013,STATE:AZ,NAME:Maricopa,LSAD:County}}
+	// Output: Header{Name:US__counties,Envelope:[-179.14734,17.884813,179.77847,71.352561],Type:Unknown,Columns:6,Features:3221,NodeSize:16,CRS:{Org:EPSG,Code:4269,Name:NAD83,WKT:1280 bytes}}
+	// First search, first Result: Feature{Geometry:{Type:MultiPolygon,Bounds:[-88.263572,41.469555,-87.524044,42.154265],Parts:1},Properties:{STATE_FIPS:17,COUNTY_FIP:031,FIPS:17031,STATE:IL,NAME:Cook,LSAD:County}}
+	// Second search, first Result: Feature{Geometry:{Type:MultiPolygon,Bounds:[-113.33438,32.504938,-111.03991,34.04817],Parts:1},Properties:{STATE_FIPS:04,COUNTY_FIP:013,FIPS:04013,STATE:AZ,NAME:Maricopa,LSAD:County}}
 }
 
 func ExamplePropReader() {

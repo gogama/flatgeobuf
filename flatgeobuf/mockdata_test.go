@@ -86,6 +86,18 @@ func (mc *mockColumn) build(bldr *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return flat.ColumnEnd(bldr)
 }
 
+func (mc *mockColumn) buildAsBytes() []byte {
+	bldr := flatbuffers.NewBuilder(2048)
+	hdr := mc.build(bldr)
+	flat.FinishSizePrefixedHeaderBuffer(bldr, hdr)
+	return bldr.FinishedBytes()
+}
+
+func (mc *mockColumn) buildAsTable() *flat.Column {
+	b := mc.buildAsBytes()
+	return flat.GetSizePrefixedRootAsColumn(b, 0)
+}
+
 func buildMockColumns(bldr *flatbuffers.Builder, cols []mockColumn, startVector func(builder *flatbuffers.Builder, numElems int) flatbuffers.UOffsetT) flatbuffers.UOffsetT {
 	offsets := make([]flatbuffers.UOffsetT, len(cols))
 	for i := range offsets {
@@ -343,7 +355,7 @@ func (mg *mockGeometry) build(bldr *flatbuffers.Builder) flatbuffers.UOffsetT {
 		}
 		if len(mg.t) > 0 {
 			offset := buildDoubleVector(bldr, mg.t)
-			defer flat.GeometryAddXy(bldr, offset)
+			defer flat.GeometryAddT(bldr, offset)
 		}
 		if len(mg.tm) > 0 {
 			bldr.StartVector(flatbuffers.SizeUint64, len(mg.tm), flatbuffers.SizeUint64)

@@ -19,93 +19,102 @@ func HeaderString(hdr *flat.Header) string {
 	var b strings.Builder
 	b.WriteString("Header{")
 	if err := safeFlatBuffersInteraction(func() error {
-		stringBytes(&b, "Name", hdr.Name())
-		stringEnvelope(&b, hdr)
-		stringStr(&b, ",Type", hdr.GeometryType().String())
-		stringFlags(&b, hdr.HasZ(), hdr.HasM(), hdr.HasT(), hdr.HasTm())
-		stringInt64(&b, ",NumColumns", int64(hdr.ColumnsLength()))
+		var needComma bool
+		needComma = stringBytes(&b, needComma, "Name", hdr.Name()) || needComma
+		needComma = stringEnvelope(&b, needComma, hdr) || needComma
+		stringStr(&b, needComma, "Type", hdr.GeometryType().String())
+		stringHeaderFlags(&b, hdr.HasZ(), hdr.HasM(), hdr.HasT(), hdr.HasTm())
+		stringColumns(&b, hdr)
 		numFeatures := hdr.FeaturesCount()
 		if numFeatures > 0 {
-			stringUint64(&b, ",NumFeatures", hdr.FeaturesCount())
+			stringUint64(&b, true, "Features", hdr.FeaturesCount())
 		} else {
-			stringStr(&b, ",NumFeatures", "UNKNOWN")
+			stringStr(&b, true, "Features", "Unknown")
 		}
 		nodeSize := hdr.IndexNodeSize()
 		if nodeSize > 0 {
-			stringUint64(&b, ",NodeSize", uint64(nodeSize))
+			stringUint64(&b, true, "NodeSize", uint64(nodeSize))
 		} else {
-			_, _ = fmt.Fprint(&b, ",NO INDEX")
+			_, _ = fmt.Fprint(&b, ",No Index")
 		}
 		var crs flat.Crs
-		stringKey(&b, ",CRS")
+		stringKey(&b, true, "CRS")
 		if hdr.Crs(&crs) != nil {
 			b.WriteByte('{')
-			stringBytes(&b, "Org", crs.Org())
-			stringInt64(&b, ",Code", int64(crs.Code()))
-			stringBytes(&b, ",Name", crs.Name())
+			needComma = stringBytes(&b, false, "Org", crs.Org())
+			stringInt64(&b, needComma, "Code", int64(crs.Code()))
+			stringBytes(&b, true, "Name", crs.Name())
+			stringBytes(&b, true, "Description", crs.Description())
 			wkt := crs.Wkt()
-			stringKey(&b, ",WKT")
+			stringKey(&b, true, "WKT")
 			if wkt == nil {
 				b.WriteString("<nil>")
 			} else {
 				_, _ = fmt.Fprintf(&b, "%d bytes", len(wkt))
 			}
-			stringBytes(&b, ",CodeString", crs.CodeString())
+			stringBytes(&b, true, "CodeString", crs.CodeString())
 			b.WriteByte('}')
 		} else {
 			b.WriteString("<nil>")
 		}
-		stringBytes(&b, ",Title", hdr.Title())
-		stringBytes(&b, ",Desc", hdr.Description())
-		stringBytes(&b, ",Meta", hdr.Metadata())
+		stringBytes(&b, true, "Title", hdr.Title())
+		stringBytes(&b, true, "Desc", hdr.Description())
+		stringBytes(&b, true, "Meta", hdr.Metadata())
 		return nil
 	}); err != nil {
-		return "error: " + err.Error()
+		return "Header{error: " + err.Error() + "}"
 	}
 	b.WriteByte('}')
 	return b.String()
 }
 
-func stringKey(b *strings.Builder, key string) {
+func stringKey(b *strings.Builder, needComma bool, key string) {
+	if needComma {
+		b.WriteByte(',')
+	}
 	b.WriteString(key)
 	b.WriteByte(':')
 }
 
-func stringBytes(b *strings.Builder, key string, value []byte) {
-	if value != nil {
-		stringKey(b, key)
-		b.Write(value)
+func stringBytes(b *strings.Builder, needComma bool, key string, value []byte) bool {
+	if value == nil {
+		return false
 	}
+	stringKey(b, needComma, key)
+	b.Write(value)
+	return true
 }
 
-func stringStr(b *strings.Builder, key string, value string) {
-	stringKey(b, key)
+func stringStr(b *strings.Builder, needComma bool, key string, value string) {
+	stringKey(b, needComma, key)
 	b.WriteString(value)
 }
 
-func stringInt64(b *strings.Builder, key string, value int64) {
-	stringKey(b, key)
+func stringInt64(b *strings.Builder, needComma bool, key string, value int64) {
+	stringKey(b, needComma, key)
 	_, _ = fmt.Fprintf(b, "%d", value)
 }
-func stringUint64(b *strings.Builder, key string, value uint64) {
-	stringKey(b, key)
+func stringUint64(b *strings.Builder, needComma bool, key string, value uint64) {
+	stringKey(b, needComma, key)
 	_, _ = fmt.Fprintf(b, "%d", value)
 }
 
-func stringEnvelope(b *strings.Builder, hdr *flat.Header) {
+func stringEnvelope(b *strings.Builder, needComma bool, hdr *flat.Header) bool {
 	n := hdr.EnvelopeLength()
-	if n > 0 {
-		stringKey(b, ",Envelope")
-		b.WriteByte('[')
-		_, _ = fmt.Fprintf(b, "%.8g", hdr.Envelope(0))
-		for i := 1; i < n; i++ {
-			_, _ = fmt.Fprintf(b, ",%.8g", hdr.Envelope(i))
-		}
-		b.WriteByte(']')
+	if n < 1 {
+		return false
 	}
+	stringKey(b, needComma, "Envelope")
+	b.WriteByte('[')
+	_, _ = fmt.Fprintf(b, "%.8g", hdr.Envelope(0))
+	for i := 1; i < n; i++ {
+		_, _ = fmt.Fprintf(b, ",%.8g", hdr.Envelope(i))
+	}
+	b.WriteByte(']')
+	return true
 }
 
-func stringFlags(b *strings.Builder, z, m, t, tm bool) {
+func stringHeaderFlags(b *strings.Builder, z, m, t, tm bool) {
 	if z || m || t || tm {
 		b.WriteByte(',')
 		var numPrinted int
@@ -125,6 +134,12 @@ func stringFlags(b *strings.Builder, z, m, t, tm bool) {
 	}
 }
 
+func stringColumns(b *strings.Builder, s Schema) {
+	if n := s.ColumnsLength(); n > 0 {
+		stringInt64(b, true, "Columns", int64(n))
+	}
+}
+
 // FeatureString returns a string summarizing the Feature. The returned
 // value is a summary and not meant to be exhaustive.
 //
@@ -136,7 +151,7 @@ func FeatureString(f *flat.Feature, s Schema) string {
 	var b strings.Builder
 	b.WriteString("Feature{Geometry:")
 	if err := stringGeom(f, &b); err != nil {
-		return "error: geometry: " + err.Error()
+		return "Feature{error: geometry: " + err.Error() + "}"
 	}
 	b.WriteString(",Properties:{")
 	ss := make([]Schema, 1, 2)
@@ -145,9 +160,11 @@ func FeatureString(f *flat.Feature, s Schema) string {
 		ss = append(ss, s)
 	}
 	if err := stringProps(f, &b, ss); err != nil {
-		return "error: properties: " + err.Error()
+		return "Feature{error: properties: " + err.Error() + "}"
 	}
-	b.WriteString("}}")
+	b.WriteByte('}')
+	stringColumns(&b, f)
+	b.WriteByte('}')
 	return b.String()
 }
 
@@ -165,12 +182,32 @@ func stringGeom(f *flat.Feature, b *strings.Builder) error {
 			} else {
 				b.WriteString(bounds.String())
 			}
+			stringGeomCounts(b, g.EndsLength(), g.ZLength(), g.MLength(), g.TLength(), g.TmLength(), g.PartsLength())
 			b.WriteByte('}')
 		} else {
 			b.WriteString("<nil>")
 		}
 		return nil
 	})
+}
+
+func stringGeomCounts(b *strings.Builder, ends, z, m, t, tm, parts int) {
+	if ends > 0 || z > 0 || m > 0 || t > 0 || tm > 0 || parts > 0 {
+		b.WriteByte(',')
+		var numPrinted int
+		count := func(name string, value int) {
+			if value > 0 {
+				stringInt64(b, numPrinted > 0, name, int64(value))
+				numPrinted++
+			}
+		}
+		count("Ends", ends)
+		count("Z", z)
+		count("M", m)
+		count("T", t)
+		count("TM", tm)
+		count("Parts", parts)
+	}
 }
 
 func stringProps(f *flat.Feature, b *strings.Builder, s []Schema) error {
@@ -215,7 +252,7 @@ func stringProps(f *flat.Feature, b *strings.Builder, s []Schema) error {
 
 func geomBounds(g *flat.Geometry, b *packedrtree.Box) {
 	n := g.XyLength()
-	for i := 0; i < n; i += 2 {
+	for i := 0; i+1 < n; i += 2 {
 		b.ExpandXY(g.Xy(i+0), g.Xy(i+1))
 	}
 	n = g.PartsLength()

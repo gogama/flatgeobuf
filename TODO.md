@@ -1,7 +1,8 @@
 NEXT STEPS:
     1. Finish unit testing package flatgeobuf.
-    2. If possible, fix openFile to perhaps embed the test data files
-       if that will make the examples run on pkg.go.dev?
+    2. Since the go:embed thing didn't work, my next strategem is to
+       use a go:generate type script to physically embed the bytes
+       in `example_test.go`.
     3. If I'm committing to Go 1.20 due to unsafe.String, then:
         (a) replace all interface{} with any.
         (b) consider using a generics-based heap which is faster? Or
