@@ -1,22 +1,18 @@
 NEXT STEPS:
-    1. Finish unit testing package flatgeobuf.
-    2. Since the go:embed thing didn't work, my next strategem is to
+    1. Since the go:embed thing didn't work, my next strategem is to
        use a go:generate type script to physically embed the bytes
        in `example_test.go`.
-    3. If I'm committing to Go 1.20 due to unsafe.String, then:
-        (a) replace all interface{} with any.
-        (b) consider using a generics-based heap which is faster? Or
-            maybe do that another day. THIS CAN WAIT FOR ANOTHER DAY.
-            LET'S DROP IT UNTIL PERFORMANCE BECOMES AN ISSUE.
-    4. Cut v0.9.5-beta.
-    5. Add GitHub action to build/test on commit? (If free.)
-    6. Update copyrights to 2024. 
-    7. Clear out any remaining TODO, for e.g. example_test.go.
-    8. Finish README.md items:
+    2. If I'm committing to Go 1.20 due to unsafe.String, then replace
+       all interface{} with any.
+    3. Cut v0.9.5-beta.
+    4. Add GitHub action to build/test on commit? (If free.)
+    5. Update copyrights to 2024. 
+    6. Clear out any remaining TODO, for e.g. example_test.go.
+    7. Finish README.md items:
         (a) Project Status. 
         (b) Getting started
         (c) Compatibility
-    9. Cut v1.0.0.
+    8. Cut v1.0.0.
 
 Future directions:
 1. Another interesting interaction system would be an Appender which

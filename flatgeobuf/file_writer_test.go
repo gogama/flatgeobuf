@@ -148,7 +148,7 @@ func TestFileWriter_Header(t *testing.T) {
 
 			n, err := w.Header(hdr)
 
-			assert.EqualError(t, err, "flatgeobuf: failed to write header: flatgeobuf: FlatBuffers table buffer is smaller than the size prefix (size=4294967295, len=16, gap=4294967283)")
+			assert.EqualError(t, err, "flatgeobuf: failed to write header: flatgeobuf: FlatBuffers table buffer is smaller than size prefix indicates (need=4+4294967295, len=16, gap=4294967283)")
 			assert.Equal(t, magicLen, n)
 		})
 
@@ -590,7 +590,7 @@ func TestFileWriter_IndexData(t *testing.T) {
 
 				n, err = w.IndexData([]flat.Feature{{}})
 
-				assert.EqualError(t, err, "flatgeobuf: failed to index feature 0: flatgeobuf: feature 0: flatgeobuf: FlatBuffers table buffer is too small for a size prefix (required=4, len=0)")
+				assert.EqualError(t, err, "flatgeobuf: failed to index feature 0: flatgeobuf: feature 0: flatgeobuf: FlatBuffers table buffer is too small for a size prefix (need=4, len=0)")
 				assert.Equal(t, 0, n)
 			})
 
@@ -841,7 +841,7 @@ func TestFileWriter_Data(t *testing.T) {
 
 				n, err = w.Data([]flat.Feature{{}})
 
-				assert.EqualError(t, err, "flatgeobuf: failed to write feature 0 at data index 0: flatgeobuf: FlatBuffers table buffer is too small for a size prefix (required=4, len=0)")
+				assert.EqualError(t, err, "flatgeobuf: failed to write feature 0 at data index 0: flatgeobuf: FlatBuffers table buffer is too small for a size prefix (need=4, len=0)")
 				assert.Equal(t, 0, n)
 			})
 
@@ -859,7 +859,7 @@ func TestFileWriter_Data(t *testing.T) {
 
 				n, err = w.Data([]flat.Feature{*f})
 
-				assert.EqualError(t, err, "flatgeobuf: failed to write feature 0 at data index 0: flatgeobuf: FlatBuffers table buffer is smaller than the size prefix (size=100001, len=4, gap=100001)")
+				assert.EqualError(t, err, "flatgeobuf: failed to write feature 0 at data index 0: flatgeobuf: FlatBuffers table buffer is smaller than size prefix indicates (need=4+100001, len=4, gap=100001)")
 				assert.Equal(t, 0, n)
 			})
 

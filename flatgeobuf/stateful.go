@@ -15,13 +15,13 @@ type state int
 
 const (
 	uninitialized state = 0x00
-	beforeMagic         = 0x11
-	beforeHeader        = 0x21
-	afterHeader         = 0x22
-	beforeIndex         = 0x31
-	afterIndex          = 0x32
-	inData              = 0x42
-	eof                 = 0x52
+	beforeMagic   state = 0x11
+	beforeHeader  state = 0x21
+	afterHeader   state = 0x22
+	beforeIndex   state = 0x31
+	afterIndex    state = 0x32
+	inData        state = 0x42
+	eof           state = 0x52
 )
 
 type transitionType int

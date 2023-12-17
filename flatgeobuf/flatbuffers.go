@@ -39,7 +39,7 @@ func writeSizePrefixedTable(w io.Writer, t flatbuffers.Table) (n int, err error)
 	if size, err = tableSize(t); err != nil {
 		return
 	} else if uint64(len(t.Bytes)) < uint64(size)+flatbuffers.SizeUint32 {
-		err = fmtErr("FlatBuffers table buffer is smaller than the size prefix (size=%d, len=%d, gap=%d)", size, len(t.Bytes), uint64(size)+flatbuffers.SizeUint32-uint64(len(t.Bytes)))
+		err = fmtErr("FlatBuffers table buffer is smaller than size prefix indicates (need=%d+%d, len=%d, gap=%d)", flatbuffers.SizeUint32, size, len(t.Bytes), uint64(size)+flatbuffers.SizeUint32-uint64(len(t.Bytes)))
 		return
 	} else {
 		n, err = w.Write(t.Bytes[0 : flatbuffers.SizeUint32+size])
@@ -49,7 +49,7 @@ func writeSizePrefixedTable(w io.Writer, t flatbuffers.Table) (n int, err error)
 
 func tableSize(t flatbuffers.Table) (size uint32, err error) {
 	if len(t.Bytes) < flatbuffers.SizeUint32 {
-		err = fmtErr("FlatBuffers table buffer is too small for a size prefix (required=%d, len=%d)", flatbuffers.SizeUint32, len(t.Bytes))
+		err = fmtErr("FlatBuffers table buffer is too small for a size prefix (need=%d, len=%d)", flatbuffers.SizeUint32, len(t.Bytes))
 		return
 	}
 	size = flatbuffers.GetUint32(t.Bytes)
