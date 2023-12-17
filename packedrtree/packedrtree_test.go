@@ -780,20 +780,20 @@ func TestUnmarshal(t *testing.T) {
 			setup           func(*mockReader)
 			numRefs         int
 			nodeSize        uint16
-			expected        []interface{}
+			expected        []any
 			require64BitInt bool
 		}{
 			{
 				name:     "NodeCountOverflowsInt",
 				numRefs:  math.MaxInt,
 				nodeSize: 2,
-				expected: []interface{}{"packedrtree: total node count overflows int"},
+				expected: []any{"packedrtree: total node count overflows int"},
 			},
 			{
 				name:            "IndexSizeOverflowsInt64",
 				numRefs:         math.MaxInt / 32,
 				nodeSize:        16,
-				expected:        []interface{}{"packedrtree: index size overflows int"},
+				expected:        []any{"packedrtree: index size overflows int"},
 				require64BitInt: true,
 			},
 			{
@@ -806,7 +806,7 @@ func TestUnmarshal(t *testing.T) {
 				},
 				numRefs:  1,
 				nodeSize: 2,
-				expected: []interface{}{"packedrtree: failed to read index bytes: " + io.ErrUnexpectedEOF.Error(), io.ErrUnexpectedEOF},
+				expected: []any{"packedrtree: failed to read index bytes: " + io.ErrUnexpectedEOF.Error(), io.ErrUnexpectedEOF},
 			},
 		}
 
@@ -928,7 +928,7 @@ func TestSeek(t *testing.T) {
 			numRefs         int
 			nodeSize        uint16
 			b               Box
-			expected        []interface{}
+			expected        []any
 			require64BitInt bool
 		}{
 			{
@@ -941,7 +941,7 @@ func TestSeek(t *testing.T) {
 				},
 				numRefs:  2,
 				nodeSize: 6,
-				expected: []interface{}{"packedrtree: failed to cache index start offset: " + io.ErrClosedPipe.Error(), io.ErrClosedPipe},
+				expected: []any{"packedrtree: failed to cache index start offset: " + io.ErrClosedPipe.Error(), io.ErrClosedPipe},
 			},
 			{
 				name: "NodeCountOverflowsInt",
@@ -953,7 +953,7 @@ func TestSeek(t *testing.T) {
 				},
 				numRefs:  math.MaxInt,
 				nodeSize: 2,
-				expected: []interface{}{"packedrtree: total node count overflows int"},
+				expected: []any{"packedrtree: total node count overflows int"},
 			},
 			{
 				name: "IndexSizeOverflowsInt64",
@@ -965,7 +965,7 @@ func TestSeek(t *testing.T) {
 				},
 				numRefs:         math.MaxInt / 32,
 				nodeSize:        16,
-				expected:        []interface{}{"packedrtree: index size overflows int"},
+				expected:        []any{"packedrtree: index size overflows int"},
 				require64BitInt: true,
 			},
 			{
@@ -978,7 +978,7 @@ func TestSeek(t *testing.T) {
 				},
 				numRefs:  2,
 				nodeSize: 6,
-				expected: []interface{}{"packedrtree: index end offset overflows int64"},
+				expected: []any{"packedrtree: index end offset overflows int64"},
 			},
 			{
 				name: "FailToReadInFetch",
@@ -994,7 +994,7 @@ func TestSeek(t *testing.T) {
 				},
 				numRefs:  2,
 				nodeSize: 6,
-				expected: []interface{}{"packedrtree: failed to read nodes [0..1), rel. offset 0: " + io.ErrUnexpectedEOF.Error(), io.ErrUnexpectedEOF},
+				expected: []any{"packedrtree: failed to read nodes [0..1), rel. offset 0: " + io.ErrUnexpectedEOF.Error(), io.ErrUnexpectedEOF},
 			},
 			{
 				name: "FailToSeekInFetch",
@@ -1031,7 +1031,7 @@ func TestSeek(t *testing.T) {
 				numRefs:  prt.NumRefs(),
 				nodeSize: prt.NodeSize(),
 				b:        Box{XMin: 0.25, YMin: 0.25, XMax: 0.75, YMax: 0.75},
-				expected: []interface{}{"packedrtree: failed to seek to node 5, rel. offset 80: " + io.ErrUnexpectedEOF.Error(), io.ErrUnexpectedEOF},
+				expected: []any{"packedrtree: failed to seek to node 5, rel. offset 80: " + io.ErrUnexpectedEOF.Error(), io.ErrUnexpectedEOF},
 			},
 			{
 				name: "FailToSeekPastIndex",
@@ -1059,7 +1059,7 @@ func TestSeek(t *testing.T) {
 				numRefs:  prt.NumRefs(),
 				nodeSize: prt.NodeSize(),
 				b:        EmptyBox,
-				expected: []interface{}{"packedrtree: failed to skip to end of index after Seek: " + io.ErrUnexpectedEOF.Error(), io.ErrUnexpectedEOF},
+				expected: []any{"packedrtree: failed to skip to end of index after Seek: " + io.ErrUnexpectedEOF.Error(), io.ErrUnexpectedEOF},
 			},
 		}
 

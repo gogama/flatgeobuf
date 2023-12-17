@@ -38,7 +38,7 @@ const (
 	inside transitionType = 1
 )
 
-func (s *stateful) close(a interface{}) error {
+func (s *stateful) close(a any) error {
 	if s.err == ErrClosed {
 		return ErrClosed
 	}

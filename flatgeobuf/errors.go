@@ -42,11 +42,11 @@ func textErr(text string) error {
 	return errors.New(packageName + text)
 }
 
-func fmtErr(format string, a ...interface{}) error {
+func fmtErr(format string, a ...any) error {
 	return fmt.Errorf(packageName+format, a...)
 }
 
-func wrapErr(format string, err error, a ...interface{}) error {
+func wrapErr(format string, err error, a ...any) error {
 	return fmt.Errorf(packageName+format+": %w", append(a, err)...)
 }
 
@@ -54,6 +54,6 @@ func textPanic(text string) {
 	panic(packageName + text)
 }
 
-func fmtPanic(format string, a ...interface{}) {
+func fmtPanic(format string, a ...any) {
 	panic(fmt.Sprintf(packageName+format, a...))
 }

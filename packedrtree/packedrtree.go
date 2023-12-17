@@ -196,11 +196,11 @@ type ticket struct {
 // ticketBag behaves like a stack.
 type ticketBag []ticket
 
-func (tq ticketBag) Len() int            { return len(tq) }
-func (tq ticketBag) Less(i, j int) bool  { return tq[i].nodeIndex < tq[j].nodeIndex }
-func (tq ticketBag) Swap(i, j int)       { tq[i], tq[j] = tq[j], tq[i] }
-func (tq *ticketBag) Push(x interface{}) { stackPush(tq, x.(ticket)) }
-func (tq *ticketBag) Pop() interface{} {
+func (tq ticketBag) Len() int           { return len(tq) }
+func (tq ticketBag) Less(i, j int) bool { return tq[i].nodeIndex < tq[j].nodeIndex }
+func (tq ticketBag) Swap(i, j int)      { tq[i], tq[j] = tq[j], tq[i] }
+func (tq *ticketBag) Push(x any)        { stackPush(tq, x.(ticket)) }
+func (tq *ticketBag) Pop() any {
 	return stackPop(tq)
 }
 

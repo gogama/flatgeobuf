@@ -210,7 +210,7 @@ type PropValue struct {
 	// column, or key.
 	Col flat.Column
 	// Value is the deserialized property value.
-	Value interface{}
+	Value any
 	// ColIndex is the zero-based index of the property within the
 	// feature's column schema.
 	ColIndex uint16

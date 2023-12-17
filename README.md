@@ -24,7 +24,7 @@ coming soon.
 
 ## Compatibility
 
-coming soon.
+Works with all Go versions 1.20 and up.
 
 ## FlatGeobuf Format Primer
 
