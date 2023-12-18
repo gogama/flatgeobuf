@@ -6,34 +6,37 @@ package flatgeobuf_test
 
 import (
 	"bytes"
-	"embed"
+	"compress/bzip2"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"io/fs"
+	"io"
 	"sort"
+	"strings"
 
 	"github.com/gogama/flatgeobuf/flatgeobuf"
 	"github.com/gogama/flatgeobuf/flatgeobuf/flat"
+	testdata "github.com/gogama/flatgeobuf/flatgeobuf/testdata/flatgeobuf"
 	"github.com/gogama/flatgeobuf/packedrtree"
 	flatbuffers "github.com/google/flatbuffers/go"
 )
 
-//go:embed testdata/flatgeobuf/*.fgb
-var testFiles embed.FS
-
-func openFile(name string) fs.File {
-	f, err := testFiles.Open(name)
+func testdataReader(data string) io.Reader {
+	var r io.Reader
+	r = strings.NewReader(data)
+	r = base64.NewDecoder(base64.StdEncoding, r)
+	r = bzip2.NewReader(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		panic(err)
 	}
-	return f
+	return bytes.NewReader(b)
 }
 
 func ExampleMagic() {
-	f := openFile("testdata/flatgeobuf/poly00.fgb")
-	defer f.Close()
+	var r = testdataReader(testdata.Poly00FGB)
 
-	version, err := flatgeobuf.Magic(f)
+	version, err := flatgeobuf.Magic(r)
 	fmt.Printf("%+v, %v\n", version, err)
 	// Output: {Major:3 Patch:0}, <nil>
 }
@@ -44,7 +47,7 @@ func ExampleFileReader_emptyFile() {
 	// index (but gets an error because the file has no index), and
 	// reads the data section, which contains no features.
 
-	r := flatgeobuf.NewFileReader(openFile("testdata/flatgeobuf/empty.fgb"))
+	r := flatgeobuf.NewFileReader(testdataReader(testdata.EmptyFGB))
 	defer r.Close()
 
 	hdr, err := r.Header()
@@ -70,7 +73,7 @@ func ExampleFileReader_unknownFeatureCount() {
 	// available features at once. It is equivalent to using Data() in
 	// a loop until EOF is reached.
 
-	r := flatgeobuf.NewFileReader(openFile("testdata/flatgeobuf/unknown_feature_count.fgb"))
+	r := flatgeobuf.NewFileReader(testdataReader(testdata.UnknownFeatureCountFGB))
 	defer r.Close()
 
 	hdr, err := r.Header()
@@ -95,7 +98,7 @@ func ExampleFileReader_Index() {
 	// reads the data section up to the first candidate feature and
 	// prints a string summary of the candidate.
 
-	r := flatgeobuf.NewFileReader(openFile("testdata/flatgeobuf/countries.fgb"))
+	r := flatgeobuf.NewFileReader(testdataReader(testdata.CountriesFGB))
 	defer r.Close()
 
 	hdr, err := r.Header()
@@ -139,7 +142,7 @@ func ExampleFileReader_IndexSearch_streaming() {
 	// all candidate features in a streaming manner, reading only the
 	// minimum necessary data into memory.
 
-	r := flatgeobuf.NewFileReader(openFile("testdata/flatgeobuf/UScounties.fgb"))
+	r := flatgeobuf.NewFileReader(testdataReader(testdata.UScountiesFGB))
 	defer r.Close()
 
 	hdr, err := r.Header()
