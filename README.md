@@ -6,21 +6,58 @@ performant binary encoding for geographic data based on
 
 ## Project Status
 
-An alpha cut was released on 2023-10-19 under the tag `v0.9.0-alpha`. A
-beta cut is expected by 2023-12-31 or sooner, with a stable API and
-`v1.0.0` release by 2024-01-31.
+The most recent release is [v0.9.3-alpha](https://github.com/gogama/flatgeobuf/releases/tag/v0.9.3-alpha).
 
-You can already peruse the documentation at the official Go docs
-website, [here](https://pkg.go.dev/github.com/gogama/flatgeobuf).
-
-The goal between now and beta is to gather **YOUR FEEDBACK** on the
-API, documentation, and discoverability of features. Issues and pull
-requests are gratefully accepted, although they may not get looked at
-until the end of November due to vacation. 
+A beta release is expected by 2023-12-31. A stable v1.0.0 will be
+released before 2024-01-31.
 
 ## Getting Started
 
-coming soon.
+Get the code:
+
+```shell
+$ go get github.com/gogama/flatgeobuf
+```
+
+Read a Flatgeobuf file:
+
+```go
+package getStartedReading
+
+import (
+	"os"
+
+	"github.com/gogama/flatgeobuf/flatgeobuf"
+)
+
+func main() {
+	f, _ := os.Open("example.fgb") 
+	r := flatgeobuf.NewFileReader(f)
+	// Use methods on FileReader 'r' to read header; read or search Index; or
+	// read features. Use a PropReader to read feature properties. 
+	//     https://pkg.go.dev/github.com/gogama/flatgeobuf/flatgeobuf#FileReader
+}
+```
+
+Write a Flatgeobuf file:
+
+```go
+package getStartedWriting
+
+import (
+    "os"
+
+    "github.com/gogama/flatgeobuf/flatgeobuf"
+)
+
+func main() {
+  f, _ := os.Create("example.fgb")
+  w := flatgeobuf.NewFileWriter(f)
+  // Use methods on FileWriter 'w' to write header; write index; write
+  // features; or index and write features together.
+  //     https://pkg.go.dev/github.com/gogama/flatgeobuf/flatgeobuf#FileWriter
+}
+```
 
 ## Compatibility
 
