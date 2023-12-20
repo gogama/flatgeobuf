@@ -26,7 +26,6 @@ package getStartedReading
 
 import (
 	"os"
-
 	"github.com/gogama/flatgeobuf/flatgeobuf"
 )
 
@@ -46,7 +45,6 @@ package getStartedWriting
 
 import (
     "os"
-
     "github.com/gogama/flatgeobuf/flatgeobuf"
 )
 
