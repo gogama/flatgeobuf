@@ -553,6 +553,18 @@ var mockFiles = []mockFile{
 		},
 	},
 	{
+		name: "feature_corrupt",
+		header: &mockHeader{
+			indexNodeSize: uint16Ptr(0),
+		},
+		dataBytes: [][]byte{
+			{
+				flatbuffers.SizeUOffsetT, 0, 0, 0,
+				31, 46, 31, 46,
+			},
+		},
+	},
+	{
 		name: "index_size_overflow",
 		header: &mockHeader{
 			featuresCount: math.MaxInt64,

@@ -1,6 +1,5 @@
 NEXT STEPS:
     1. Cut v0.9.5-beta.
-    2. Clear out any remaining TODO, for e.g. example_test.go.
     3. Finish README.md items:
         (a) Project Status. 
     4. Delete this TODO file.

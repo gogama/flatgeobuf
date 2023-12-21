@@ -990,11 +990,39 @@ func TestFileReader_Data(t *testing.T) {
 
 		t.Run("Corrupt File", func(t *testing.T) {
 			t.Run("Corrupted Feature", func(t *testing.T) {
-				// TODO
+				mockDataRunTest(t, func(t *testing.T, mf *mockFile) {
+					mr := newMockDataBytesReadSeeker(t, mf, nil, nil)
+					r := NewFileReader(mr)
+					hdr, err := r.Header()
+					require.NotNil(t, hdr)
+					require.NoError(t, err)
+					p := make([]flat.Feature, 1)
+					n, err := r.Data(p)
+					require.NoError(t, err)
+					require.Equal(t, 1, n)
+					mr.verify()
+
+					s := FeatureString(&p[0], nil)
+
+					assert.Equal(t, "Feature{error: geometry: panic: flatbuffers: runtime error: slice bounds out of range [773795363:8]}", s)
+				}, "feature_corrupt")
 			})
 
-			t.Run("Missing Expected Feature", func(t *testing.T) {
-				// TODO
+			t.Run("Data Section Ends before Expected Feature", func(t *testing.T) {
+				mockDataRunTest(t, func(t *testing.T, mf *mockFile) {
+					mr := newMockDataBytesReadSeeker(t, mf, nil, nil)
+					r := NewFileReader(mr)
+					hdr, err := r.Header()
+					require.NotNil(t, hdr)
+					require.NoError(t, err)
+					p := make([]flat.Feature, 1)
+
+					n, err := r.Data(p)
+
+					assert.Same(t, io.EOF, err)
+					assert.Equal(t, 0, n)
+					mr.verify()
+				}, "truncated_data")
 			})
 		})
 	})
