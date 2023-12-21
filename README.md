@@ -4,15 +4,11 @@ Native Go library implementing [FlatGeobuf](https://flatgeobuf.org/), a
 performant binary encoding for geographic data based on
 [FlatBuffers](https://flatbuffers.dev/).
 
-## Project Status
-
-![test status](https://github.com/gogama/flatgeobuf/actions/workflows/tests.yaml/badge.svg)
-
-The most recent release is [v0.9.3-alpha](https://github.com/gogama/flatgeobuf/releases/tag/v0.9.3-alpha).
-
-A stable v1.0.0 will be released by 2024-01-31.
-
 ## Getting Started
+
+Read the docs:
+
+[![docs](https://pkg.go.dev/badge/github.com/gogama/flatgeobuf.svg)](https://pkg.go.dev/github.com/gogama/flatgeobuf)
 
 Get the code:
 
@@ -111,7 +107,7 @@ GitHub repository's [FlatBuffer schema](https://github.com/flatgeobuf/flatgeobuf
 
 Thanks to @bjornharrtell for developing the FlatGeobuf specification and
 @thehoneymad for getting me interested in it. Thanks to JetBrains, for
-generously donating an open source license for their lovely GoLand IDE.
+generously donating an open source license for their GoLand IDE.
 
 ## Shameless Plugs
 
