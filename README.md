@@ -10,8 +10,7 @@ performant binary encoding for geographic data based on
 
 The most recent release is [v0.9.3-alpha](https://github.com/gogama/flatgeobuf/releases/tag/v0.9.3-alpha).
 
-A beta release is expected by 2023-12-31. A stable v1.0.0 will be
-released before 2024-01-31.
+A stable v1.0.0 will be released by 2024-01-31.
 
 ## Getting Started
 
@@ -21,7 +20,7 @@ Get the code:
 $ go get github.com/gogama/flatgeobuf
 ```
 
-Read a Flatgeobuf file:
+Read a Flatgeobuf file, search the index, _etc._:
 
 ```go
 package getStartedReading
@@ -34,13 +33,13 @@ import (
 func main() {
 	f, _ := os.Open("example.fgb") 
 	r := flatgeobuf.NewFileReader(f)
-	// Use methods on FileReader 'r' to read header; read or search Index; or
+	// Use methods on FileReader 'r' to read header; read or search index; or
 	// read features. Use a PropReader to read feature properties. 
 	//     https://pkg.go.dev/github.com/gogama/flatgeobuf/flatgeobuf#FileReader
 }
 ```
 
-Write a Flatgeobuf file:
+Write a Flatgeobuf file, create index of features, _etc._:
 
 ```go
 package getStartedWriting

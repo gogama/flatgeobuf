@@ -1,12 +1,11 @@
 NEXT STEPS:
-    1. Add GitHub action to build/test on commit? (If free.)
-    2. Cut v0.9.5-beta.
-    3. Update copyrights to 2024. 
-    5. Clear out any remaining TODO, for e.g. example_test.go.
-    6. Finish README.md items:
+    1. Cut v0.9.5-beta.
+    2. Update copyrights to 2024. 
+    3. Clear out any remaining TODO, for e.g. example_test.go.
+    4. Finish README.md items:
         (a) Project Status. 
-    7. Delete this TODO file.
-    8. Cut v1.0.0.
+    5. Delete this TODO file.
+    6. Cut v1.0.0.
 
 Future directions:
 1. Another interesting interaction system would be an Appender which
