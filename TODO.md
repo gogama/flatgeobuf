@@ -1,11 +1,10 @@
 NEXT STEPS:
     1. Cut v0.9.5-beta.
-    2. Update copyrights to 2024. 
-    3. Clear out any remaining TODO, for e.g. example_test.go.
-    4. Finish README.md items:
+    2. Clear out any remaining TODO, for e.g. example_test.go.
+    3. Finish README.md items:
         (a) Project Status. 
-    5. Delete this TODO file.
-    6. Cut v1.0.0.
+    4. Delete this TODO file.
+    5. Cut v1.0.0.
 
 Future directions:
 1. Another interesting interaction system would be an Appender which

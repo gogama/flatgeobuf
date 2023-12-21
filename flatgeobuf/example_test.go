@@ -114,8 +114,8 @@ func ExampleFileReader_Index() {
 
 	// Search the index for features intersecting a bounding box.
 	results := index.Search(packedrtree.Box{
-		XMin: -157.84076832853575, YMin: 21.270348544130442, // TODO: Switch to Gogama, ON.
-		XMax: -157.8224676330033, YMax: 21.281955907519844,
+		XMin: -81.73195714597884, YMin: 47.667150959664525,
+		XMax: -81.71291285629297, YMax: 47.67849844412743,
 	})
 	fmt.Printf("Results -> %+v\n", results)
 
@@ -131,8 +131,8 @@ func ExampleFileReader_Index() {
 	}
 	// Output: Header{Name:countries,Envelope:[-180,-85.609038,180,83.64513],Type:MultiPolygon,Columns:2,Features:179,NodeSize:16,CRS:{Org:EPSG,Code:4326,Name:WGS 84,WKT:354 bytes}}
 	// Index -> PackedRTree{Bounds:[-180,-85.609038,180,83.64513],NumRefs:179,NodeSize:16}
-	// Results -> [{Offset:160424 RefIndex:165}]
-	// First Result: Feature{Geometry:{Type:MultiPolygon,Bounds:[-171.79111,18.91619,-66.96466,71.357764],Parts:10},Properties:{id:USA,name:United States of America}}
+	// Results -> [{Offset:147776 RefIndex:162} {Offset:160424 RefIndex:165} {Offset:167864 RefIndex:166}]
+	// First Result: Feature{Geometry:{Type:MultiPolygon,Bounds:[-180,41.151416,180,81.2504],Parts:13},Properties:{id:RUS,name:Russia}}
 }
 
 func ExampleFileReader_IndexSearch_streaming() {
