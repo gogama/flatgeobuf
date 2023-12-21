@@ -6,6 +6,8 @@ performant binary encoding for geographic data based on
 
 ## Project Status
 
+![test status](https://github.com/gogama/flatgeobuf/actions/workflows/tests.yaml/badge.svg)
+
 The most recent release is [v0.9.3-alpha](https://github.com/gogama/flatgeobuf/releases/tag/v0.9.3-alpha).
 
 A beta release is expected by 2023-12-31. A stable v1.0.0 will be
