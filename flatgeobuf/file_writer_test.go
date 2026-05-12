@@ -730,7 +730,7 @@ func TestFileWriter_IndexData(t *testing.T) {
 					RefIndex: 1,
 				},
 				{
-					Offset:   76,
+					Offset:   80,
 					RefIndex: 0,
 				},
 			}, sr)

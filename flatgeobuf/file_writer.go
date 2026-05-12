@@ -9,6 +9,7 @@ import (
 
 	"github.com/gogama/flatgeobuf/flatgeobuf/flat"
 	"github.com/gogama/flatgeobuf/packedrtree"
+	flatbuffers "github.com/google/flatbuffers/go"
 )
 
 // FileWriter writes a FlatGeobuf file to an underlying stream.
@@ -178,7 +179,7 @@ func (w *FileWriter) IndexData(p []flat.Feature) (n int, err error) {
 				return wrapErr("feature %d", err, i)
 			}
 			bounds.Expand(&refs[i].Box)
-			offset += int64(size)
+			offset += int64(size) + flatbuffers.SizeUint32
 		}
 		return nil
 	})
